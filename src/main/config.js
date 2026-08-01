@@ -47,6 +47,24 @@ const DEFAULTS = {
     },
     network: { interface: null },
     nowPlaying: { enabled: true, intervalMs: 2000 },
+    // Coordinates are never guessed from the IP address: that would send the
+    // user's location to a third party on every start. Null means "off".
+    weather: {
+      enabled: true,
+      latitude: null,
+      longitude: null,
+      units: 'metric',
+      refreshMinutes: 15,
+      timeoutMs: 8000,
+    },
+    ping: {
+      enabled: true,
+      host: '1.1.1.1',
+      port: 443,
+      intervalMs: 10000,
+      timeoutMs: 3000,
+      samples: 3,
+    },
   },
   theme: 'espresso',
   ui: {
@@ -67,6 +85,9 @@ const DEFAULTS = {
   thresholds: {
     cpuTemp: { warn: 75, crit: 90 },
     gpuTemp: { warn: 72, crit: 85 },
+    // NVMe drives idle warm and throttle around 70; these are drive numbers,
+    // not CPU ones.
+    driveTemp: { warn: 60, crit: 72 },
     load: { warn: 70, crit: 90 },
     memory: { warn: 75, crit: 90 },
   },

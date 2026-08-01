@@ -152,7 +152,48 @@ function extract(sensors, { fanSensor = null } = {}) {
     (s) => s.type === 'Temperature' && /\/lpc\//i.test(s.id),
   ]);
 
+  // Drive temperatures are already in the feed we fetch for the CPU, so they
+  // cost nothing extra. LHM groups storage under /nvme/N/ or /hdd/N/, and the
+  // parent hardware node carries the model name, which is far too long for the
+  // panel — the flattener keeps only the sensor's own text, so number the
+  // drives in the order LHM reports them.
+  const driveTemps = sensors
+    .filter(
+      (s) =>
+        s.type === 'Temperature' &&
+        /\/(nvme|hdd|ssd|storage)\/\d+\//i.test(s.id) &&
+        s.value !== null &&
+        // NVMe drives publish their shutdown limits as temperature sensors:
+        // "Warning Temperature" (99 C) and "Critical Temperature" (109 C) are
+        // constants describing the hardware, not readings. Taking the hottest
+        // sensor per drive picks those every time and reports a healthy 48 C
+        // drive as 109 C.
+        !/warning|critical|limit|threshold/i.test(s.text),
+    )
+    .reduce((acc, s) => {
+      const drive = s.id.match(/\/(nvme|hdd|ssd|storage)\/(\d+)\//i);
+      const key = drive ? `${drive[1]}${drive[2]}` : s.id;
+      // Composite is the NVMe spec's primary sensor and the one every other
+      // tool reports; prefer it, then a plainly-named temperature, then
+      // whatever is left.
+      const rank = /composite/i.test(s.text) ? 0 : /^temperature/i.test(s.text) ? 1 : 2;
+      const prev = acc.get(key);
+      if (!prev || rank < prev.rank) {
+        acc.set(key, {
+          key,
+          rank,
+          kind: drive ? drive[1].toLowerCase() : 'disk',
+          tempC: s.value,
+        });
+      }
+      return acc;
+    }, new Map());
+
   return {
+    drives: [...driveTemps.values()].map((d, i) => ({
+      label: `${d.kind === 'nvme' ? 'NVME' : 'DISK'}${i}`,
+      tempC: d.tempC,
+    })),
     cpuTempC: cpuTemp?.value ?? null,
     cpuTempLabel: cpuTemp?.text ?? null,
     cpuPowerW: cpuPower?.value ?? null,

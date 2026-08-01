@@ -198,12 +198,113 @@ body {
   white-space: nowrap;
 }
 
-.bar__os {
-  font-size: 13px;
+/* ── weather, in the bar's centre gap ────────────────────────── */
+
+.wx {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 0 12px;
+}
+
+.wx[hidden] {
+  display: none;
+}
+
+.wx__icon {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  overflow: visible;
+}
+
+/* Icons inherit the machine's palette rather than arriving pre-coloured. */
+.wx-sun circle,
+.wx-fill {
+  fill: var(--brass);
+  stroke: none;
+}
+
+.wx-sun line {
+  stroke: var(--brass);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.wx-cloud {
+  fill: none;
+  stroke: var(--ink-dim);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.wx-precip line {
+  stroke: var(--mark-nominal);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.wx-bolt path {
+  fill: var(--brass);
+  stroke: none;
+}
+
+.wx__now {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.wx__temp {
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.wx__deg {
+  font-size: 12px;
   color: var(--ink-muted);
+}
+
+.wx__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.wx__label {
+  font-size: 12px;
+  color: var(--ink-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.wx__range {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wx__hi {
+  color: var(--mark-warn);
+}
+
+.wx__lo {
+  color: var(--mark-nominal);
+}
+
+.wx__sep {
+  color: var(--ink-faint);
 }
 
 .bar__right {
@@ -255,6 +356,23 @@ body {
   display: flex;
   align-items: baseline;
   gap: 4px;
+}
+
+/* The date rides above the seconds, so it costs no horizontal room in a bar
+   that is already carrying weather. */
+.bar__clockstack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: center;
+  margin-right: 2px;
+}
+
+.bar__date {
+  font-size: 13px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  letter-spacing: 0.04em;
 }
 
 .bar__time {
@@ -680,6 +798,17 @@ body {
   margin-left: auto;
 }
 
+/* Latency takes the status ramp, but always beside its own numeral and the
+   word PING - never colour alone. */
+.flow__ping {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--status-read);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── thread strip ────────────────────────────────────────────── */
 
 .strip {
@@ -796,6 +925,25 @@ body {
   height: 100%;
   background: var(--ink-faint);
   border-radius: 2px;
+}
+
+.disks__caps,
+.drives {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.drive {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.drive__temp {
+  color: var(--status-read);
 }
 
 /* ── overlays ────────────────────────────────────────────────── */

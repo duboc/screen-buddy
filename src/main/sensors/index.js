@@ -6,6 +6,8 @@ const { NvidiaSource } = require('./nvidia');
 const { LhmSource } = require('./lhm');
 const { NowPlayingSource } = require('./nowplaying');
 const { NetStatsSource } = require('./netstats');
+const { WeatherSource } = require('./weather');
+const { PingSource } = require('./ping');
 
 /**
  * Merges the three sources into one normalized snapshot and emits it on a timer.
@@ -28,6 +30,8 @@ class SensorHub extends EventEmitter {
       ...config.sensors.network,
       intervalMs: config.polling.fastMs,
     });
+    this.weather = new WeatherSource(config.sensors.weather);
+    this.ping = new PingSource(config.sensors.ping);
     this.fastTimer = null;
     this.slowTimer = null;
     this.lastSnapshot = null;
@@ -37,6 +41,8 @@ class SensorHub extends EventEmitter {
     this.nvidia.start();
     this.nowPlaying.start();
     this.netStats.start();
+    this.weather.start();
+    this.ping.start();
     await this.system.init();
     await Promise.all([this.system.pollFast(), this.lhm.poll()]);
     this.emitSnapshot();
@@ -63,6 +69,8 @@ class SensorHub extends EventEmitter {
     const lhm = this.lhm.read();
     const media = this.nowPlaying.read();
     const net = this.netStats.read();
+    const weather = this.weather.read();
+    const ping = this.ping.read();
 
     const s = sys.data || {};
     const g = gpu.data || {};
@@ -132,6 +140,12 @@ class SensorHub extends EventEmitter {
 
       disks: s.disks ?? [],
 
+      // Drive temperatures ride along in the LHM feed; empty when it is absent.
+      drives: l.drives ?? [],
+
+      weather: weather.data ?? null,
+      ping: ping.data ?? null,
+
       // null when nothing is loaded in any player; the panel shows an idle
       // state rather than disappearing, so the layout never shifts.
       media: media.data ?? null,
@@ -151,6 +165,7 @@ class SensorHub extends EventEmitter {
         lhm: { ok: lhm.available, reason: lhm.reason },
         media: { ok: media.available, reason: media.reason },
         net: { ok: net.available, reason: net.reason },
+        weather: { ok: weather.available, reason: weather.reason },
       },
     };
   }
@@ -161,6 +176,8 @@ class SensorHub extends EventEmitter {
     this.nvidia.stop();
     this.nowPlaying.stop();
     this.netStats.stop();
+    this.weather.stop();
+    this.ping.stop();
   }
 }
 

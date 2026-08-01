@@ -27,7 +27,25 @@
             <path class="cup__saucer" d="M2 21h15" />
           </svg>
           <span class="bar__name" id="host">—</span>
-          <span class="bar__os" id="os"></span>
+        </div>
+
+        <!-- Weather sits in the bar's dead centre space. Hidden entirely
+             (not blanked) until coordinates are configured, so an unset
+             option costs no layout. -->
+        <div class="wx" id="weather" hidden>
+          <svg class="wx__icon" viewBox="0 0 24 24" id="weather-icon" aria-hidden="true"></svg>
+          <div class="wx__now">
+            <span class="wx__temp" id="weather-temp">--</span>
+            <span class="wx__deg" id="weather-unit">°C</span>
+          </div>
+          <div class="wx__detail">
+            <span class="wx__label" id="weather-label">—</span>
+            <span class="wx__range">
+              <span class="wx__hi" id="weather-high">--</span>
+              <span class="wx__sep">/</span>
+              <span class="wx__lo" id="weather-low">--</span>
+            </span>
+          </div>
         </div>
 
         <div class="bar__right">
@@ -41,6 +59,9 @@
             <span class="bar__uptime" id="uptime">—</span>
           </div>
           <div class="bar__clock">
+            <div class="bar__clockstack">
+              <span class="bar__date" id="date">—</span>
+            </div>
             <span class="bar__time" id="clock">--:--</span>
             <span class="bar__secs" id="clock-secs"></span>
           </div>
@@ -215,7 +236,10 @@
           <div class="flow__scale">
             <span class="micro">PEAK</span>
             <span id="net-peak">--</span>
-            <span class="flow__window" id="net-window"></span>
+            <span class="flow__ping" id="ping" data-status="nominal">
+              <span class="micro">PING</span>
+              <span id="ping-value">--</span>
+            </span>
           </div>
         </article>
       </section>
@@ -232,7 +256,10 @@
       <!-- ── footer ──────────────────────────────────────────────── -->
       <footer class="foot" id="panel-footer">
         <div class="sources" id="sources"></div>
-        <div class="disks" id="disks"></div>
+        <div class="disks">
+          <span class="drives" id="drives"></span>
+          <span class="disks__caps" id="disks"></span>
+        </div>
       </footer>
 
       <div class="grain" aria-hidden="true"></div>

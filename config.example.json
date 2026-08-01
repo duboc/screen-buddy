@@ -49,6 +49,24 @@
       "$comment": "Reads the Windows global media session, so it shows whatever is playing — Spotify, a browser tab, VLC — with no API key or login. Needs no setup.",
       "enabled": true,
       "intervalMs": 2000
+    },
+    "weather": {
+      "$comment": "Open-Meteo — no API key, no signup, no account. Set your coordinates to switch it on; while they are null the weather block simply does not render. Deliberately does NOT geolocate by IP: that would send your address to a third party at every start, and would land on your ISP's city or your VPN exit anyway. Two decimal places (about 1 km) is plenty — the forecast grid is 1-11 km, so more precision only leaks your location. units: metric or imperial.",
+      "enabled": true,
+      "latitude": null,
+      "longitude": null,
+      "units": "metric",
+      "refreshMinutes": 15,
+      "timeoutMs": 8000
+    },
+    "ping": {
+      "$comment": "Internet reachability. Times a TCP handshake rather than shelling out to ping.exe: no process spawn per sample, and ICMP is filtered on many networks so a failed ICMP ping is a poor proxy for 'no internet'. Reports the median of the last few samples.",
+      "enabled": true,
+      "host": "1.1.1.1",
+      "port": 443,
+      "intervalMs": 10000,
+      "timeoutMs": 3000,
+      "samples": 3
     }
   },
 
@@ -76,6 +94,8 @@
     "$comment": "Where the dial's printed danger zone begins, and where the ready lamp changes state. Celsius for temperatures, percent for the rest.",
     "cpuTemp": { "warn": 75, "crit": 90 },
     "gpuTemp": { "warn": 72, "crit": 85 },
+    "$driveTemp": "NVMe drives idle warm and start throttling around 70C, so these are deliberately lower than the CPU numbers.",
+    "driveTemp": { "warn": 60, "crit": 72 },
     "load": { "warn": 70, "crit": 90 },
     "memory": { "warn": 75, "crit": 90 }
   },

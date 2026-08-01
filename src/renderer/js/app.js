@@ -1,5 +1,6 @@
 import * as f from './format.js';
 import { buildDialFace, needleAngle } from './dial.js';
+import { renderWeatherIcon } from './weather-icons.js';
 
 /* ── constants ─────────────────────────────────────────────────── */
 
@@ -19,10 +20,20 @@ const STALE_AFTER_MS = 6000;
 const el = {
   hud: document.getElementById('hud'),
   host: document.getElementById('host'),
-  os: document.getElementById('os'),
   uptime: document.getElementById('uptime'),
   clock: document.getElementById('clock'),
   clockSecs: document.getElementById('clock-secs'),
+  date: document.getElementById('date'),
+  weather: document.getElementById('weather'),
+  weatherIcon: document.getElementById('weather-icon'),
+  weatherTemp: document.getElementById('weather-temp'),
+  weatherUnit: document.getElementById('weather-unit'),
+  weatherLabel: document.getElementById('weather-label'),
+  weatherHigh: document.getElementById('weather-high'),
+  weatherLow: document.getElementById('weather-low'),
+  ping: document.getElementById('ping'),
+  pingValue: document.getElementById('ping-value'),
+  drives: document.getElementById('drives'),
   lamp: document.getElementById('lamp'),
   lampText: document.getElementById('lamp-text'),
   cpu: document.getElementById('gauge-cpu'),
@@ -39,7 +50,6 @@ const el = {
   netAreaTx: document.getElementById('net-area-tx'),
   netLineTx: document.getElementById('net-line-tx'),
   netPeak: document.getElementById('net-peak'),
-  netWindow: document.getElementById('net-window'),
   mediaApp: document.getElementById('media-app'),
   mediaState: document.getElementById('media-state'),
   mediaTitle: document.getElementById('media-title'),
@@ -210,9 +220,6 @@ function renderNetwork(net) {
 
   el.netIface.textContent = net.iface ?? '';
   el.netPeak.textContent = f.bytesInline(peak, { perSecond: true, digits: 0 });
-  el.netWindow.textContent = `LAST ${Math.round(
-    (netHistory.length * config.polling.fastMs) / 1000,
-  )}s`;
 }
 
 /* ── now playing ───────────────────────────────────────────────── */
@@ -301,6 +308,76 @@ function renderDisks(disks) {
   el.disks.replaceChildren(frag);
 }
 
+/* ── weather ───────────────────────────────────────────────────── */
+
+let lastWeatherIcon = null;
+
+function renderWeather(w) {
+  // Hidden rather than blanked when unconfigured or offline, so an unset
+  // option or a dropped connection costs no layout and leaves no empty frame.
+  if (!w) {
+    el.weather.hidden = true;
+    return;
+  }
+  el.weather.hidden = false;
+
+  if (w.icon !== lastWeatherIcon) {
+    renderWeatherIcon(el.weatherIcon, w.icon);
+    lastWeatherIcon = w.icon;
+  }
+
+  el.weatherTemp.textContent = f.num(w.tempC, 0);
+  el.weatherUnit.textContent = `°${w.unit}`;
+  // "Overcast 20°" reads better than a bare condition, and feels-like is the
+  // number people actually want when it differs from the raw temperature.
+  el.weatherLabel.textContent =
+    Number.isFinite(w.feelsC) && Math.round(w.feelsC) !== Math.round(w.tempC)
+      ? `${w.label} · feels ${f.num(w.feelsC, 0)}°`
+      : w.label;
+  el.weatherHigh.textContent = `${f.num(w.highC, 0)}°`;
+  el.weatherLow.textContent = `${f.num(w.lowC, 0)}°`;
+}
+
+/* ── latency ───────────────────────────────────────────────────── */
+
+// Thresholds in ms: anything under 60 is a good connection, over 150 is
+// noticeable. Fixed rather than configurable — these are properties of human
+// perception, not of the machine.
+const PING_THRESHOLDS = { warn: 60, crit: 150 };
+
+function renderPing(p) {
+  if (!p) {
+    el.ping.dataset.status = 'crit';
+    el.pingValue.textContent = f.DASH;
+    return;
+  }
+  el.ping.dataset.status = f.statusOf(p.ms, PING_THRESHOLDS);
+  el.pingValue.textContent = `${f.num(p.ms, 0)} ms`;
+}
+
+/* ── drive temperatures ────────────────────────────────────────── */
+
+function renderDrives(drives, thresholds) {
+  const frag = document.createDocumentFragment();
+  for (const d of drives.slice(0, 3)) {
+    const node = document.createElement('span');
+    node.className = 'drive';
+    node.dataset.status = f.statusOf(d.tempC, thresholds);
+
+    const label = document.createElement('span');
+    label.className = 'micro';
+    label.textContent = d.label;
+
+    const temp = document.createElement('span');
+    temp.className = 'drive__temp';
+    temp.textContent = `${f.celsius(d.tempC)}°`;
+
+    node.append(label, temp);
+    frag.append(node);
+  }
+  el.drives.replaceChildren(frag);
+}
+
 /* ── ready lamp ────────────────────────────────────────────────── */
 
 const LAMP_WORDS = { nominal: 'READY', warn: 'HEATING', crit: 'OVER TEMP' };
@@ -331,10 +408,25 @@ function renderClock() {
   el.clockSecs.textContent = config.ui.showSeconds
     ? String(now.getSeconds()).padStart(2, '0')
     : '';
+
+  // Locale-formatted, so it reads naturally wherever the machine lives.
+  el.date.textContent = now.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 /* ── snapshot ──────────────────────────────────────────────────── */
 
+/**
+ * Draws one snapshot.
+ *
+ * Wrapped by `renderSafe` below: this function touches a lot of elements, and
+ * a single missing node used to throw partway through and silently leave every
+ * panel after that point frozen or blank. On a display nobody interacts with,
+ * that failure is invisible - the numbers just quietly stop being true.
+ */
 function render(s) {
   lastSnapshotAt = Date.now();
   el.hud.classList.remove('hud--stale');
@@ -342,10 +434,10 @@ function render(s) {
   const t = config.thresholds;
 
   el.host.textContent = s.sys.host ?? '—';
-  el.os.textContent = s.sys.os ?? '';
   el.uptime.textContent = f.duration(s.sys.uptimeSec);
 
   renderLamp(s, t);
+  renderWeather(s.weather);
 
   renderGauge(
     el.cpu,
@@ -392,11 +484,34 @@ function render(s) {
   }
 
   if (config.ui.panels.cores) renderCores(s.cpu.coreLoads, t.load);
-  if (config.ui.panels.network) renderNetwork(s.net);
+  if (config.ui.panels.network) {
+    renderNetwork(s.net);
+    renderPing(s.ping);
+  }
   if (config.ui.panels.media) renderMedia(s.media);
   if (config.ui.panels.footer) {
     renderSources(s.sources);
+    renderDrives(s.drives ?? [], t.driveTemp);
     renderDisks(s.disks ?? []);
+  }
+}
+
+let renderErrors = 0;
+
+/**
+ * Never let one broken field take the rest of the panel down with it. Logs
+ * loudly to devtools (`npm run dev`) so the failure is still findable.
+ */
+function renderSafe(snapshot) {
+  try {
+    render(snapshot);
+  } catch (err) {
+    renderErrors += 1;
+    // Only the first few, or a genuinely broken build would spam the console
+    // once per second forever.
+    if (renderErrors <= 5) {
+      console.error(`[hud] render failed (${renderErrors})`, err);
+    }
   }
 }
 
@@ -428,10 +543,10 @@ async function boot() {
     }
   }, 1000);
 
-  window.screenBuddy.onSnapshot(render);
+  window.screenBuddy.onSnapshot(renderSafe);
 
   const latest = await window.screenBuddy.getLatest();
-  if (latest) render(latest);
+  if (latest) renderSafe(latest);
 }
 
 boot().catch((err) => {
