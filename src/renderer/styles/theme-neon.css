@@ -1,30 +1,18 @@
 /* ── theme: neon ─────────────────────────────────────────────────
-   Cyan → amber → magenta status ramp on a near-black surface.
+   The original cyberpunk treatment, kept as an alternative. Set
+   "theme": "neon" in config.json to use it.
 
-   Two colour layers, and the split is deliberate:
+   Same two-layer rule as the espresso theme: the MARK layer carries data and
+   is validated; the brighter glow layer is decoration that always duplicates a
+   mark already drawn beside a numeral.
 
-   MARK layer (--status-mark, --net-*-fill, --cell-mark) carries the data.
-   These are the validated steps. Checked with the data-viz validator against
-   this exact surface (#04070d):
+   Mark steps validated against this theme's surface (#04070d):
 
      node scripts/validate_palette.js "#0e9fb6,#c4841a,#e0247f,#7d5fe0" \
           --mode dark --surface "#04070d" --pairs all
      → lightness band PASS · chroma floor PASS · CVD separation PASS
        (worst all-pairs ΔE 8.6 deutan) · normal-vision PASS (20.6) ·
-       contrast vs surface PASS (all ≥ 3:1)
-
-   GLOW layer (--status-glow, --*-glow, --status-halo) is decoration: thin
-   2px inner strokes, text colour and CSS shadows. It always duplicates a mark
-   that is already drawn and always sits beside a numeral, so it never encodes
-   anything by itself. Those brighter steps sit above the dark-mode lightness
-   band on purpose — on a 5-inch panel read from across a desk the lift is
-   what makes the numbers legible, and it is applied to hairlines and text
-   rather than to large fills, which is where the band's glare concern bites.
-
-   Status colours here mean state (nominal / warning / critical) and are never
-   reused as series identity. The network series are separated by position
-   (receive above the axis, transmit below) and by direct labels; hue only
-   reinforces. */
+       contrast vs surface PASS (all ≥ 3:1) */
 
 body[data-theme='neon'] {
   color-scheme: dark;
@@ -32,108 +20,115 @@ body[data-theme='neon'] {
   --font-ui: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system,
     sans-serif;
 
-  /* surfaces & ink */
   --surface: #04070d;
-  --panel: #070c15;
-  --track: #131c2b;
+  --plate-bg: linear-gradient(177deg, #0a1220 0%, #070d18 100%);
+  --plate-edge: #1b2637;
+  --plate-sheen: linear-gradient(
+    90deg,
+    transparent,
+    rgba(34, 231, 255, 0.18) 22%,
+    rgba(34, 231, 255, 0.18) 78%,
+    transparent
+  );
+  --plate-shadow: 0 0 0 1px rgba(34, 231, 255, 0.04) inset;
+  --plate-radius: 4px;
   --rule: #1b2637;
-  --grid: #101a28;
-  --ink-primary: #e6f2f7;
-  --ink-secondary: #93a7bb;
+
+  --ink: #e6f2f7;
+  --ink-title: #93a7bb;
+  --ink-dim: #93a7bb;
   --ink-muted: #5d7186;
   --ink-faint: #3d4d5e;
 
-  /* status ramp — mark layer (validated) */
+  --brass: #22e7ff;
+
+  /* mark layer — validated */
   --mark-nominal: #0e9fb6;
   --mark-warn: #c4841a;
   --mark-crit: #e0247f;
 
-  /* status ramp — glow layer (decorative) */
-  --glow-nominal: #22e7ff;
-  --glow-warn: #ffb02e;
-  --glow-crit: #ff2d95;
+  /* glow layer — decoration */
+  --read-nominal: #22e7ff;
+  --read-warn: #ffb02e;
+  --read-crit: #ff2d95;
 
-  /* halos are the glow hue at low alpha; shadows only */
   --halo-nominal: rgba(34, 231, 255, 0.42);
   --halo-warn: rgba(255, 176, 46, 0.42);
   --halo-crit: rgba(255, 45, 149, 0.45);
 
-  /* network series */
-  --net-rx-glow: #22e7ff;
-  --net-rx-fill: rgba(14, 159, 182, 0.3);
-  --net-tx-glow: #a98bff;
-  --net-tx-fill: rgba(125, 95, 224, 0.3);
+  /* The dial goes dark in this theme — a black instrument face with a
+     cyan needle rather than a cream manometer. */
+  --dial-face: #070d18;
+  --dial-rim: #1b2637;
+  --dial-ink: #5d7186;
+  --zone-crit: #e0247f;
+  --needle: #22e7ff;
+  --needle-hub: #131c2b;
 
-  --ok-glow: #22e7ff;
-  --accent-glow: #22e7ff;
+  --tank-well: #131c2b;
+  --tank-edge: #1b2637;
+  --tank-graduation: #2b3a4d;
+  --lamp-well: #070d18;
+  --art-well: #070d18;
 
-  /* Defaults; JS re-points these per element via the data-status attribute. */
+  --flow-stroke: #22e7ff;
+  --flow-fill: rgba(14, 159, 182, 0.28);
+
+  --ok: #0e9fb6;
+  --ok-halo: rgba(34, 231, 255, 0.6);
+
   --status-mark: var(--mark-nominal);
-  --status-glow: var(--glow-nominal);
+  --status-read: var(--read-nominal);
   --status-halo: var(--halo-nominal);
   --cell-mark: var(--mark-nominal);
 
-  --glow-opacity: 1;
-  --scanlines-display: block;
+  --grain-display: block;
+  --grain-opacity: 1;
+  --grain-bg: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.16) 3px,
+    rgba(0, 0, 0, 0.16) 4px
+  );
 }
 
-/* Status is set as an attribute on whichever element owns the reading, so a
-   single rule set repoints all three custom properties at once. */
-[data-status='nominal'] {
+body[data-theme='neon'] [data-status='nominal'] {
   --status-mark: var(--mark-nominal);
-  --status-glow: var(--glow-nominal);
+  --status-read: var(--read-nominal);
   --status-halo: var(--halo-nominal);
 }
 
-[data-status='warn'] {
+body[data-theme='neon'] [data-status='warn'] {
   --status-mark: var(--mark-warn);
-  --status-glow: var(--glow-warn);
+  --status-read: var(--read-warn);
   --status-halo: var(--halo-warn);
 }
 
-[data-status='crit'] {
+body[data-theme='neon'] [data-status='crit'] {
   --status-mark: var(--mark-crit);
-  --status-glow: var(--glow-crit);
+  --status-read: var(--read-crit);
   --status-halo: var(--halo-crit);
 }
 
-/* Core cells are too small for a numeral, so they stay on the mark layer
-   only — three discrete steps, not a continuous ramp, matching the legend. */
-.cores__cell[data-status='nominal'] i {
+body[data-theme='neon'] .strip__cell[data-status='nominal'] i {
   --cell-mark: var(--mark-nominal);
 }
-
-.cores__cell[data-status='warn'] i {
+body[data-theme='neon'] .strip__cell[data-status='warn'] i {
   --cell-mark: var(--mark-warn);
 }
-
-.cores__cell[data-status='crit'] i {
+body[data-theme='neon'] .strip__cell[data-status='crit'] i {
   --cell-mark: var(--mark-crit);
 }
 
-.cores__swatch--low {
-  background: var(--mark-nominal);
+body[data-theme='neon'] .bigval__num {
+  text-shadow: 0 0 16px var(--status-halo);
 }
 
-.cores__swatch--mid {
-  background: var(--mark-warn);
-}
-
-.cores__swatch--high {
-  background: var(--mark-crit);
-}
-
-/* Config toggles, applied to <body> by the renderer. */
-body[data-glow='off'] {
-  --glow-opacity: 0;
-}
-
-body[data-glow='off'] .gauge__value,
-body[data-glow='off'] .meter__fill {
+body[data-theme='neon'][data-glow='off'] .bigval__num {
   text-shadow: none;
-  box-shadow: none;
 }
 
-body[data-scanlines='off'] {
-  --scanlines-display: none;
+body[data-theme='neon'][data-scanlines='off'] {
+  --grain-display: none;
 }

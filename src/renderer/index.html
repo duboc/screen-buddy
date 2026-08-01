@@ -8,176 +8,234 @@
     />
     <title>screen-buddy</title>
     <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/theme-espresso.css" />
     <link rel="stylesheet" href="styles/theme-neon.css" />
   </head>
-  <body data-theme="neon">
+  <body data-theme="espresso">
     <div class="hud" id="hud">
-      <!-- ── header ─────────────────────────────────────────────── -->
-      <header class="hud__header">
-        <div class="ident">
-          <span class="ident__mark">SCREEN·BUDDY</span>
-          <span class="ident__host" id="host">—</span>
-          <span class="ident__os" id="os"></span>
+      <!-- ── machine bar ─────────────────────────────────────────── -->
+      <header class="bar">
+        <div class="bar__brand">
+          <svg class="bar__cup" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              class="cup__body"
+              d="M3 8h13v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z"
+            />
+            <path class="cup__handle" d="M16 9.5h2.5a2.5 2.5 0 0 1 0 5H16" />
+            <path class="cup__steam" d="M7 5.5c0-1 1-1.4 1-2.5" />
+            <path class="cup__steam" d="M11 5.5c0-1 1-1.4 1-2.5" />
+            <path class="cup__saucer" d="M2 21h15" />
+          </svg>
+          <span class="bar__name" id="host">—</span>
+          <span class="bar__os" id="os"></span>
         </div>
-        <div class="header__right">
-          <div class="uptime">
-            <span class="label">UPTIME</span>
-            <span class="uptime__value" id="uptime">—</span>
+
+        <div class="bar__right">
+          <!-- Lamp never carries state alone: it always has a word beside it. -->
+          <div class="lamp" id="lamp" data-status="nominal">
+            <i class="lamp__bulb"></i>
+            <span class="lamp__text" id="lamp-text">READY</span>
           </div>
-          <div class="clock">
-            <span class="clock__time" id="clock">--:--</span>
-            <span class="clock__secs" id="clock-secs"></span>
+          <div class="bar__stat">
+            <span class="micro">ON SINCE</span>
+            <span class="bar__uptime" id="uptime">—</span>
+          </div>
+          <div class="bar__clock">
+            <span class="bar__time" id="clock">--:--</span>
+            <span class="bar__secs" id="clock-secs"></span>
           </div>
         </div>
       </header>
 
-      <!-- ── gauges + core heatmap ───────────────────────────────── -->
-      <section class="hud__gauges" id="panel-gauges">
-        <article class="gauge" id="gauge-cpu">
-          <div class="gauge__dial">
-            <svg viewBox="0 0 120 120" aria-hidden="true">
-              <circle class="arc arc--track" cx="60" cy="60" r="50" />
-              <circle class="arc arc--value" cx="60" cy="60" r="50" />
-              <circle class="arc arc--glow" cx="60" cy="60" r="50" />
-            </svg>
-            <div class="gauge__readout">
-              <span class="gauge__value" data-field="temp">--</span>
-              <span class="gauge__unit">°C</span>
+      <!-- ── gauges + reservoir ──────────────────────────────────── -->
+      <section class="row-gauges" id="panel-gauges">
+        <article class="gauge plate" id="gauge-cpu">
+          <div class="plate__head">
+            <span class="plate__title">BOILER</span>
+            <span class="plate__sub" data-field="name">—</span>
+          </div>
+          <div class="gauge__body">
+            <div class="dial" data-dial>
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <circle class="dial__face" cx="50" cy="50" r="45" />
+                <g data-ticks></g>
+                <path class="dial__zone" data-zone />
+                <g class="dial__needle" data-needle>
+                  <line x1="50" y1="50" x2="50" y2="14" />
+                </g>
+                <circle class="dial__hub" cx="50" cy="50" r="4.5" />
+                <circle class="dial__bezel" cx="50" cy="50" r="46.5" />
+              </svg>
+            </div>
+            <div class="gauge__read">
+              <div class="bigval">
+                <span class="bigval__num" data-field="temp">--</span>
+                <span class="bigval__unit">°C</span>
+              </div>
+              <div class="subval">
+                <span class="micro">LOAD</span>
+                <span class="subval__num" data-field="load">--</span>
+              </div>
             </div>
           </div>
-          <div class="gauge__meta">
-            <h2 class="gauge__title">CPU</h2>
-            <p class="gauge__sub" data-field="name">—</p>
-            <dl class="statlist">
-              <div><dt>LOAD</dt><dd data-field="load">--</dd></div>
-              <div><dt>CLOCK</dt><dd data-field="clock">--</dd></div>
-              <div><dt>POWER</dt><dd data-field="power">--</dd></div>
-              <div><dt>FAN</dt><dd data-field="fan">--</dd></div>
-            </dl>
+          <div class="plate__foot">
+            <div><span class="micro">CLOCK</span><b data-field="clock">--</b></div>
+            <div><span class="micro">POWER</span><b data-field="power">--</b></div>
+            <div><span class="micro">FAN</span><b data-field="fan">--</b></div>
           </div>
         </article>
 
-        <article class="gauge" id="gauge-gpu">
-          <div class="gauge__dial">
-            <svg viewBox="0 0 120 120" aria-hidden="true">
-              <circle class="arc arc--track" cx="60" cy="60" r="50" />
-              <circle class="arc arc--value" cx="60" cy="60" r="50" />
-              <circle class="arc arc--glow" cx="60" cy="60" r="50" />
-            </svg>
-            <div class="gauge__readout">
-              <span class="gauge__value" data-field="temp">--</span>
-              <span class="gauge__unit">°C</span>
+        <article class="gauge plate" id="gauge-gpu">
+          <div class="plate__head">
+            <span class="plate__title">GROUP HEAD</span>
+            <span class="plate__sub" data-field="name">—</span>
+          </div>
+          <div class="gauge__body">
+            <div class="dial" data-dial>
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <circle class="dial__face" cx="50" cy="50" r="45" />
+                <g data-ticks></g>
+                <path class="dial__zone" data-zone />
+                <g class="dial__needle" data-needle>
+                  <line x1="50" y1="50" x2="50" y2="14" />
+                </g>
+                <circle class="dial__hub" cx="50" cy="50" r="4.5" />
+                <circle class="dial__bezel" cx="50" cy="50" r="46.5" />
+              </svg>
+            </div>
+            <div class="gauge__read">
+              <div class="bigval">
+                <span class="bigval__num" data-field="temp">--</span>
+                <span class="bigval__unit">°C</span>
+              </div>
+              <div class="subval">
+                <span class="micro">LOAD</span>
+                <span class="subval__num" data-field="load">--</span>
+              </div>
             </div>
           </div>
-          <div class="gauge__meta">
-            <h2 class="gauge__title">GPU</h2>
-            <p class="gauge__sub" data-field="name">—</p>
-            <dl class="statlist">
-              <div><dt>LOAD</dt><dd data-field="load">--</dd></div>
-              <div><dt>CLOCK</dt><dd data-field="clock">--</dd></div>
-              <div><dt>POWER</dt><dd data-field="power">--</dd></div>
-              <div><dt>FAN</dt><dd data-field="fan">--</dd></div>
-            </dl>
+          <div class="plate__foot">
+            <div><span class="micro">CLOCK</span><b data-field="clock">--</b></div>
+            <div><span class="micro">POWER</span><b data-field="power">--</b></div>
+            <div><span class="micro">FAN</span><b data-field="fan">--</b></div>
           </div>
         </article>
 
-        <article class="cores" id="panel-cores">
-          <h2 class="cores__title">
-            THREADS <span class="cores__count" id="cores-count"></span>
-          </h2>
-          <div class="cores__grid" id="cores-grid"></div>
-          <p class="cores__legend">
-            <span class="cores__swatch cores__swatch--low"></span> idle
-            <span class="cores__swatch cores__swatch--mid"></span> busy
-            <span class="cores__swatch cores__swatch--high"></span> saturated
-          </p>
+        <article class="plate reservoir" id="panel-reservoir">
+          <div class="plate__head">
+            <span class="plate__title">RESERVOIR</span>
+          </div>
+          <div class="tanks">
+            <div class="tank" data-tank="mem">
+              <div class="tank__glass">
+                <i class="tank__fill"></i>
+                <span class="tank__mark tank__mark--hi"></span>
+                <span class="tank__mark tank__mark--mid"></span>
+                <span class="tank__mark tank__mark--lo"></span>
+              </div>
+              <span class="tank__pct" data-field="pct">--</span>
+              <span class="micro">RAM</span>
+              <span class="tank__abs" data-field="abs">--</span>
+            </div>
+            <div class="tank" data-tank="vram">
+              <div class="tank__glass">
+                <i class="tank__fill"></i>
+                <span class="tank__mark tank__mark--hi"></span>
+                <span class="tank__mark tank__mark--mid"></span>
+                <span class="tank__mark tank__mark--lo"></span>
+              </div>
+              <span class="tank__pct" data-field="pct">--</span>
+              <span class="micro">VRAM</span>
+              <span class="tank__abs" data-field="abs">--</span>
+            </div>
+          </div>
         </article>
       </section>
 
-      <!-- ── meters ─────────────────────────────────────────────── -->
-      <section class="hud__meters" id="panel-meters">
-        <div class="meter" data-meter="cpu">
-          <div class="meter__head">
-            <span class="meter__label">CPU LOAD</span>
-            <span class="meter__value" data-field="value">--</span>
+      <!-- ── now playing + flow ──────────────────────────────────── -->
+      <section class="row-mid">
+        <article class="plate media" id="panel-media">
+          <div class="plate__head">
+            <span class="plate__title">NOW BREWING</span>
+            <span class="plate__sub" id="media-app"></span>
+            <span class="media__state" id="media-state"></span>
           </div>
-          <div class="meter__track"><i class="meter__fill"></i></div>
-        </div>
-        <div class="meter" data-meter="gpu">
-          <div class="meter__head">
-            <span class="meter__label">GPU LOAD</span>
-            <span class="meter__value" data-field="value">--</span>
+          <div class="media__body">
+            <div class="media__art" id="media-art">
+              <svg viewBox="0 0 48 48" aria-hidden="true">
+                <circle class="art__disc" cx="24" cy="24" r="17" />
+                <circle class="art__hole" cx="24" cy="24" r="4" />
+                <path class="art__note" d="M20 30V17l11-2.4V28" />
+              </svg>
+            </div>
+            <div class="media__text">
+              <p class="media__title" id="media-title">Nothing playing</p>
+              <p class="media__artist" id="media-artist"></p>
+              <p class="media__album" id="media-album"></p>
+            </div>
           </div>
-          <div class="meter__track"><i class="meter__fill"></i></div>
-        </div>
-        <div class="meter" data-meter="mem">
-          <div class="meter__head">
-            <span class="meter__label">MEMORY</span>
-            <span class="meter__value" data-field="value">--</span>
+          <div class="media__progress">
+            <span class="media__time" id="media-pos">--</span>
+            <div class="media__track"><i class="media__fill" id="media-fill"></i></div>
+            <span class="media__time" id="media-end">--</span>
           </div>
-          <div class="meter__track"><i class="meter__fill"></i></div>
-        </div>
-        <div class="meter" data-meter="vram">
-          <div class="meter__head">
-            <span class="meter__label">VRAM</span>
-            <span class="meter__value" data-field="value">--</span>
+        </article>
+
+        <article class="plate flow" id="panel-network">
+          <div class="plate__head">
+            <span class="plate__title">FLOW</span>
+            <span class="plate__sub" id="net-iface"></span>
           </div>
-          <div class="meter__track"><i class="meter__fill"></i></div>
-        </div>
+          <div class="flow__reads">
+            <div class="flow__read">
+              <span class="flow__arrow">↓</span>
+              <span class="flow__num" id="net-rx">--</span>
+              <span class="flow__unit" id="net-rx-unit"></span>
+            </div>
+            <div class="flow__read">
+              <span class="flow__arrow">↑</span>
+              <span class="flow__num" id="net-tx">--</span>
+              <span class="flow__unit" id="net-tx-unit"></span>
+            </div>
+          </div>
+          <!-- Receive above the axis, transmit below, on one shared scale.
+               Identity is position plus the labels above, not hue. -->
+          <svg
+            class="flow__plot"
+            viewBox="0 0 300 52"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <line class="flow__axis" x1="0" y1="26" x2="300" y2="26" />
+            <path class="flow__area" id="net-area-rx" />
+            <path class="flow__line" id="net-line-rx" />
+            <path class="flow__area" id="net-area-tx" />
+            <path class="flow__line" id="net-line-tx" />
+          </svg>
+          <div class="flow__scale">
+            <span class="micro">PEAK</span>
+            <span id="net-peak">--</span>
+            <span class="flow__window" id="net-window"></span>
+          </div>
+        </article>
       </section>
 
-      <!-- ── network ────────────────────────────────────────────── -->
-      <section class="hud__net" id="panel-network">
-        <div class="net__head">
-          <h2 class="net__title">NETWORK</h2>
-          <span class="net__iface" id="net-iface"></span>
-          <!--
-            Identity here is carried by position (down = above the axis,
-            up = below) and by the direct labels, not by hue alone.
-          -->
-          <span class="net__reading net__reading--rx">
-            <span class="net__arrow">↓</span>
-            <span class="net__num" id="net-rx">--</span>
-            <span class="net__unit" id="net-rx-unit"></span>
-          </span>
-          <span class="net__reading net__reading--tx">
-            <span class="net__arrow">↑</span>
-            <span class="net__num" id="net-tx">--</span>
-            <span class="net__unit" id="net-tx-unit"></span>
-          </span>
+      <!-- ── thread strip ────────────────────────────────────────── -->
+      <section class="plate strip" id="panel-cores">
+        <div class="strip__label">
+          <span class="plate__title">GRINDER</span>
+          <span class="micro" id="cores-count"></span>
         </div>
-        <svg
-          class="net__plot"
-          id="net-plot"
-          viewBox="0 0 480 96"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <!-- Half-peak hairlines, so an idle link reads as an empty scale
-               rather than a broken panel. Solid, one shade off the surface. -->
-          <line class="net__grid" x1="0" y1="25" x2="480" y2="25" />
-          <line class="net__grid" x1="0" y1="71" x2="480" y2="71" />
-          <line class="net__axis" x1="0" y1="48" x2="480" y2="48" />
-          <path class="net__area net__area--rx" id="net-area-rx" />
-          <path class="net__line net__line--rx" id="net-line-rx" />
-          <path class="net__area net__area--tx" id="net-area-tx" />
-          <path class="net__line net__line--tx" id="net-line-tx" />
-        </svg>
-        <div class="net__scale">
-          <span class="label">PEAK</span>
-          <span id="net-peak">--</span>
-          <span class="net__window" id="net-window"></span>
-        </div>
+        <div class="strip__grid" id="cores-grid"></div>
       </section>
 
-      <!-- ── footer ─────────────────────────────────────────────── -->
-      <footer class="hud__footer" id="panel-footer">
+      <!-- ── footer ──────────────────────────────────────────────── -->
+      <footer class="foot" id="panel-footer">
         <div class="sources" id="sources"></div>
         <div class="disks" id="disks"></div>
       </footer>
 
-      <div class="scanlines" aria-hidden="true"></div>
-      <div class="vignette" aria-hidden="true"></div>
+      <div class="grain" aria-hidden="true"></div>
     </div>
 
     <script type="module" src="js/app.js"></script>

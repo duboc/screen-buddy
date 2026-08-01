@@ -42,20 +42,27 @@
     "network": {
       "$comment": "Leave interface null to auto-pick the busiest non-loopback adapter.",
       "interface": null
+    },
+    "nowPlaying": {
+      "$comment": "Reads the Windows global media session, so it shows whatever is playing — Spotify, a browser tab, VLC — with no API key or login. Needs no setup.",
+      "enabled": true,
+      "intervalMs": 2000
     }
   },
 
-  "theme": "neon",
+  "$theme": "espresso (warm brushed steel, cream gauge dials) or neon (cyan/magenta cyberpunk)",
+  "theme": "espresso",
 
   "ui": {
     "showSeconds": true,
     "clock24h": true,
-    "scanlines": true,
+    "scanlines": false,
     "glow": true,
-    "historySamples": 120,
+    "historySamples": 90,
     "panels": {
       "gauges": true,
-      "meters": true,
+      "reservoir": true,
+      "media": true,
       "network": true,
       "cores": true,
       "footer": true

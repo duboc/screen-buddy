@@ -74,6 +74,13 @@ export function mbPair(usedMB, totalMB) {
   return `${(usedMB / 1024).toFixed(1)} / ${(totalMB / 1024).toFixed(1)} GB`;
 }
 
+/** Track position as m:ss — the form a player shows it in. */
+export function mmss(seconds) {
+  if (!has(seconds) || seconds < 0) return DASH;
+  const s = Math.floor(seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 export function duration(seconds) {
   if (!has(seconds)) return DASH;
   const s = Math.floor(seconds);

@@ -1,6 +1,11 @@
 /* ── reset & layout ──────────────────────────────────────────────
-   Structure only. Every colour lives in the theme file, addressed
-   through custom properties, so a new theme is one stylesheet. */
+   Structure only. Every colour and material lives in a theme file,
+   addressed through custom properties, so a theme is one stylesheet.
+
+   Sizing note: this panel is read from across a desk, not from a laptop's
+   viewing distance, so type runs considerably larger than a screen UI would.
+   The row heights below are the constraint everything else is fitted into —
+   change one and check the whole column still fits. */
 
 *,
 *::before,
@@ -15,501 +20,717 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  /* The HUD is click-through at the window level, but belt-and-braces:
-     nothing here should ever show a caret or a selection highlight. */
   user-select: none;
   cursor: none;
 }
 
 body {
   background: var(--surface);
-  color: var(--ink-primary);
+  color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 14px;
-  line-height: 1.2;
+  font-size: 16px;
+  line-height: 1.15;
   -webkit-font-smoothing: antialiased;
 }
 
 .hud {
   position: relative;
   display: grid;
-  /* The network row takes 1fr so the rows always total exactly the panel
-     height — fixed values everywhere would overflow or leave a gap on any
-     display that is not precisely 600px tall. */
-  grid-template-rows: 52px 224px 112px 1fr 36px;
+  /* Only the middle row flexes, so the panel always totals exactly the
+     display height rather than overflowing or leaving a gap. */
+  grid-template-rows: 52px 268px 1fr 46px 30px;
   height: 100%;
-  padding: 8px 16px;
-  gap: 4px;
+  padding: 6px 12px;
+  gap: 5px;
 }
 
-/* Values refresh every second; tabular figures keep the digits from
-   reflowing sideways on each tick. This is the one place proportional
-   figures would be worse — a jittering readout is unreadable at a glance. */
-.gauge__value,
-.meter__value,
-.net__num,
-.clock__time,
-.uptime__value,
-.statlist dd {
+/* Readings redraw every second; tabular figures stop the digits shifting
+   sideways on each tick, which is unreadable at a glance. */
+.bigval__num,
+.subval__num,
+.bar__time,
+.bar__secs,
+.bar__uptime,
+.flow__num,
+.tank__pct,
+.tank__abs,
+.media__time,
+.plate__foot b {
   font-variant-numeric: tabular-nums;
 }
 
-.label,
-.gauge__title,
-.meter__label,
-.net__title,
-.cores__title,
-.statlist dt {
-  font-size: 10px;
+.micro {
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-muted);
   font-weight: 600;
 }
 
-/* ── header ──────────────────────────────────────────────────── */
+/* ── the machine plate: the shared panel material ────────────── */
 
-.hud__header {
+.plate {
+  position: relative;
+  border-radius: var(--plate-radius);
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-edge);
+  box-shadow: var(--plate-shadow);
+  padding: 6px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Brushed-metal sheen: a single hairline highlight along the top edge. */
+.plate::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--plate-sheen);
+  pointer-events: none;
+}
+
+.plate__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: none;
+}
+
+.plate__title {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  color: var(--ink-title);
+  white-space: nowrap;
+}
+
+.plate__sub {
+  font-size: 13px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.plate__foot {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  border-top: 1px solid var(--rule);
+  padding-top: 5px;
+  margin-top: auto;
+  flex: none;
+}
+
+.plate__foot div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.plate__foot b {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* ── machine bar ─────────────────────────────────────────────── */
+
+.bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  padding: 0 4px;
   border-bottom: 1px solid var(--rule);
-  padding-bottom: 6px;
 }
 
-.ident {
+.bar__brand {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
-.ident__mark {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  color: var(--accent-glow);
+.bar__cup {
+  width: 30px;
+  height: 30px;
+  flex: none;
 }
 
-.ident__host {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink-secondary);
-}
-
-.ident__os {
-  font-size: 11px;
-  color: var(--ink-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.header__right {
-  display: flex;
-  align-items: baseline;
-  gap: 20px;
-}
-
-.uptime {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.uptime__value {
-  font-size: 13px;
-  color: var(--ink-secondary);
-}
-
-.clock {
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.clock__time {
-  font-size: 34px;
-  font-weight: 300;
-  letter-spacing: 0.02em;
-  color: var(--ink-primary);
-  line-height: 1;
-}
-
-.clock__secs {
-  font-size: 15px;
-  font-weight: 400;
-  color: var(--accent-glow);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── gauges ──────────────────────────────────────────────────── */
-
-.hud__gauges {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.05fr;
-  gap: 12px;
-  align-items: stretch;
-}
-
-.gauge {
-  display: grid;
-  grid-template-columns: 158px 1fr;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 10px;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--panel);
-}
-
-.gauge__dial {
-  position: relative;
-  width: 158px;
-  height: 158px;
-}
-
-.gauge__dial svg {
-  width: 100%;
-  height: 100%;
-  /* -225deg puts the 270-degree sweep's origin at the lower left. */
-  transform: rotate(-225deg);
-  overflow: visible;
-}
-
-.arc {
+.cup__body {
   fill: none;
+  stroke: var(--brass);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.cup__handle,
+.cup__saucer {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 1.6;
   stroke-linecap: round;
 }
 
-.arc--track {
-  stroke: var(--track);
-  stroke-width: 6;
+.cup__steam {
+  fill: none;
+  stroke: var(--ink-muted);
+  stroke-width: 1.3;
+  stroke-linecap: round;
 }
 
-/* The data-bearing mark: the validated in-band step. */
-.arc--value {
-  stroke: var(--status-mark);
-  stroke-width: 6;
-  transition: stroke-dasharray 320ms ease-out, stroke 320ms linear;
+.bar__name {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-title);
+  white-space: nowrap;
 }
 
-/* Decorative highlight only — a thin bright inner stroke plus its halo.
-   It repeats the value arc exactly; it never encodes anything on its own. */
-.arc--glow {
-  stroke: var(--status-glow);
-  stroke-width: 2;
-  filter: drop-shadow(0 0 5px var(--status-glow));
-  opacity: var(--glow-opacity);
-  transition: stroke-dasharray 320ms ease-out, stroke 320ms linear;
-}
-
-.gauge__readout {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  flex-direction: row;
-}
-
-.gauge__value {
-  font-size: 46px;
-  font-weight: 300;
-  line-height: 1;
-  color: var(--status-glow);
-  text-shadow: 0 0 14px var(--status-halo);
-}
-
-.gauge__unit {
+.bar__os {
   font-size: 13px;
   color: var(--ink-muted);
-  align-self: flex-start;
-  margin-top: 8px;
-}
-
-.gauge__meta {
-  min-width: 0;
-}
-
-.gauge__title {
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  color: var(--ink-secondary);
-}
-
-.gauge__sub {
-  font-size: 10px;
-  color: var(--ink-muted);
-  margin: 2px 0 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.statlist {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 10px;
+.bar__right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: none;
 }
 
-.statlist div {
+.lamp {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border-radius: 20px;
+  border: 1px solid var(--plate-edge);
+  background: var(--lamp-well);
+}
+
+.lamp__bulb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--status-mark);
+  box-shadow: 0 0 9px var(--status-halo);
+  flex: none;
+}
+
+.lamp__text {
+  font-size: 12px;
+  letter-spacing: 0.17em;
+  font-weight: 700;
+  color: var(--status-mark);
+}
+
+.bar__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.bar__uptime {
+  font-size: 19px;
+  color: var(--ink-dim);
+}
+
+.bar__clock {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.bar__time {
+  font-size: 46px;
+  font-weight: 300;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.bar__secs {
+  font-size: 21px;
+  color: var(--brass);
+}
+
+/* ── gauges row ──────────────────────────────────────────────── */
+
+.row-gauges {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.78fr;
+  gap: 5px;
+  min-height: 0;
+}
+
+.gauge__body {
+  display: grid;
+  grid-template-columns: 152px 1fr;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+}
+
+.dial {
+  width: 152px;
+  height: 152px;
+  position: relative;
+}
+
+.dial svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The dial is a physical object: cream face, brass bezel, engraved ticks. */
+.dial__face {
+  fill: var(--dial-face);
+  stroke: var(--dial-rim);
+  stroke-width: 0.6;
+}
+
+.dial__bezel {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 2.4;
+}
+
+.dial__tick {
+  stroke: var(--dial-ink);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
+.dial__tick--major {
+  stroke-width: 1.8;
+}
+
+.dial__num {
+  fill: var(--dial-ink);
+  font-size: 8px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  font-family: var(--font-ui);
+}
+
+/* Static printed danger zone — a reference band on the dial, exactly like a
+   real manometer. Because the reading is carried by needle POSITION and by the
+   numeral, no colour has to be distinguishable for the value to be read. */
+.dial__zone {
+  fill: none;
+  stroke: var(--zone-crit);
+  stroke-width: 3.4;
+  opacity: 0.85;
+}
+
+.dial__needle line {
+  stroke: var(--needle);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  transform-origin: 50px 50px;
+  transition: transform 420ms cubic-bezier(0.34, 1.36, 0.64, 1);
+}
+
+.dial__hub {
+  fill: var(--needle-hub);
+  stroke: var(--dial-rim);
+  stroke-width: 0.6;
+}
+
+.gauge__read {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bigval {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.bigval__num {
+  font-size: 88px;
+  font-weight: 300;
+  line-height: 0.9;
+  color: var(--status-read);
+  letter-spacing: -0.03em;
+}
+
+.bigval__unit {
+  font-size: 23px;
+  color: var(--ink-muted);
+}
+
+.subval {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.subval__num {
+  font-size: 46px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1;
+}
+
+/* ── reservoir ───────────────────────────────────────────────── */
+
+.tanks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 2px;
+}
+
+.tank {
+  display: grid;
+  grid-template-rows: 1fr auto auto auto;
+  gap: 1px;
+  justify-items: center;
+  min-height: 0;
+}
+
+/* Glass vessel: inset well, water fills from the bottom. */
+.tank__glass {
+  position: relative;
+  width: 100%;
+  border-radius: 4px 4px 6px 6px;
+  background: var(--tank-well);
+  border: 1px solid var(--tank-edge);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tank__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: block;
+  height: 0;
+  background: var(--status-mark);
+  transition: height 420ms ease-out, background 420ms linear;
+}
+
+/* Meniscus: a brighter line at the waterline. */
+.tank__fill::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--status-read);
+}
+
+/* Graduations on both walls, like a machine's sight glass. */
+.tank__mark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--tank-graduation) 0 10px,
+    transparent 10px calc(100% - 10px),
+    var(--tank-graduation) calc(100% - 10px) 100%
+  );
+}
+
+.tank__mark--hi {
+  top: 25%;
+}
+.tank__mark--mid {
+  top: 50%;
+}
+.tank__mark--lo {
+  top: 75%;
+}
+
+.tank__pct {
+  font-size: 42px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1.05;
+}
+
+.tank__abs {
+  font-size: 13px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+/* ── middle row: now playing + flow ──────────────────────────── */
+
+.row-mid {
+  display: grid;
+  grid-template-columns: 1.92fr 1fr;
+  gap: 5px;
+  min-height: 0;
+}
+
+.media__body {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+}
+
+.media__art {
+  width: 78px;
+  height: 78px;
+  border-radius: 4px;
+  background: var(--art-well);
+  border: 1px solid var(--plate-edge);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.media__art svg {
+  width: 52px;
+  height: 52px;
+}
+
+.art__disc {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 1.4;
+}
+
+.art__hole {
+  fill: var(--art-well);
+  stroke: var(--brass);
+  stroke-width: 1.2;
+}
+
+.art__note {
+  fill: none;
+  stroke: var(--ink-dim);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.media__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.media__title {
+  font-size: 38px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.08;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media__artist {
+  font-size: 24px;
+  color: var(--brass);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media__album {
+  font-size: 16px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media__state {
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  color: var(--brass);
+  flex: none;
+}
+
+.media__progress {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  margin-top: auto;
+  flex: none;
+}
+
+.media__time {
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+.media__track {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--tank-well);
+  overflow: hidden;
+}
+
+.media__fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: var(--brass);
+  transition: width 500ms linear;
+}
+
+/* ── flow ────────────────────────────────────────────────────── */
+
+.flow__reads {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  flex: none;
+}
+
+.flow__read {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.flow__arrow {
+  font-size: 23px;
+  color: var(--brass);
+  flex: none;
+}
+
+.flow__num {
+  font-size: 42px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.flow__unit {
+  font-size: 13px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.flow__plot {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.flow__axis {
+  stroke: var(--rule);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.flow__line {
+  fill: none;
+  stroke: var(--flow-stroke);
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+.flow__area {
+  fill: var(--flow-fill);
+  stroke: none;
+}
+
+.flow__scale {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 14px;
+  color: var(--ink-muted);
+  flex: none;
+}
+
+.flow__window {
+  margin-left: auto;
+}
+
+/* ── thread strip ────────────────────────────────────────────── */
+
+.strip {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 14px;
+  padding: 5px 11px;
+}
+
+.strip__label {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 
-/* nowrap matters: "4.29 GHz" wrapping onto a second line reflows the whole
-   stat block every time the clock crosses a digit boundary. */
-.statlist dd {
-  font-size: 16px;
-  font-weight: 400;
-  color: var(--ink-primary);
-  white-space: nowrap;
-}
-
-/* ── core heatmap ────────────────────────────────────────────── */
-
-.cores {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--panel);
-}
-
-.cores__title {
-  display: flex;
-  justify-content: space-between;
-}
-
-.cores__count {
-  color: var(--ink-secondary);
-  letter-spacing: 0.08em;
-}
-
-.cores__grid {
+.strip__grid {
   display: grid;
-  /* Column count is set from the thread count in JS. */
-  gap: 3px; /* the 2px-plus surface gap that separates fills */
-  flex: 1;
-  align-content: stretch;
+  gap: 3px; /* the surface gap that separates adjacent fills */
+  height: 100%;
+  align-items: end;
 }
 
-.cores__cell {
-  border-radius: 2px;
-  background: var(--track);
+.strip__cell {
   position: relative;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--tank-well);
   overflow: hidden;
 }
 
-/* Fill rises from the bottom, so the grid reads as 32 tiny bar charts. */
-.cores__cell i {
+.strip__cell i {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   display: block;
   background: var(--cell-mark);
-  transition: height 260ms ease-out, background 260ms linear;
-}
-
-.cores__legend {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-
-.cores__swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  display: inline-block;
-}
-
-.cores__swatch:not(:first-child) {
-  margin-left: 6px;
-}
-
-/* ── meters ──────────────────────────────────────────────────── */
-
-.hud__meters {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  align-content: center;
-  padding: 6px 0;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-}
-
-.meter {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.meter__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.meter__value {
-  font-size: 17px;
-  color: var(--ink-primary);
-  white-space: nowrap;
-}
-
-/* Thin mark, not a thick saturated block. */
-.meter__track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--track);
-  overflow: hidden;
-}
-
-.meter__fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  border-radius: 3px;
-  background: var(--status-mark);
-  box-shadow: 0 0 6px var(--status-halo);
-  transition: width 320ms ease-out, background 320ms linear;
-}
-
-/* ── network ─────────────────────────────────────────────────── */
-
-.hud__net {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 2px;
-  min-height: 0;
-}
-
-.net__head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.net__iface {
-  font-size: 10px;
-  color: var(--ink-muted);
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.net__reading {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
-.net__arrow {
-  font-size: 13px;
-}
-
-.net__reading--rx .net__arrow {
-  color: var(--net-rx-glow);
-}
-
-.net__reading--tx .net__arrow {
-  color: var(--net-tx-glow);
-}
-
-.net__num {
-  font-size: 19px;
-  font-weight: 400;
-  color: var(--ink-primary);
-}
-
-.net__unit {
-  font-size: 10px;
-  color: var(--ink-muted);
-  min-width: 40px;
-}
-
-.net__plot {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-}
-
-.net__axis {
-  stroke: var(--rule);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.net__grid {
-  stroke: var(--grid);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.net__line {
-  fill: none;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-  stroke-linejoin: round;
-}
-
-.net__line--rx {
-  stroke: var(--net-rx-glow);
-}
-
-.net__line--tx {
-  stroke: var(--net-tx-glow);
-}
-
-.net__area {
-  stroke: none;
-}
-
-.net__area--rx {
-  fill: var(--net-rx-fill);
-}
-
-.net__area--tx {
-  fill: var(--net-tx-fill);
-}
-
-.net__scale {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 10px;
-  color: var(--ink-muted);
-}
-
-.net__window {
-  margin-left: auto;
+  transition: height 280ms ease-out, background 280ms linear;
 }
 
 /* ── footer ──────────────────────────────────────────────────── */
 
-.hud__footer {
+.foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   border-top: 1px solid var(--rule);
-  padding-top: 6px;
-  font-size: 10px;
+  padding: 0 4px;
+  font-size: 12px;
   color: var(--ink-muted);
 }
 
@@ -517,7 +738,7 @@ body {
 .disks {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 13px;
   min-width: 0;
 }
 
@@ -525,29 +746,24 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-/* Status dot never carries the meaning alone — the label sits beside it,
-   and an unavailable source spells out why. */
+/* The dot never carries meaning alone — a label always sits beside it and an
+   unavailable source spells out why. */
 .source__dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--ink-muted);
+  background: var(--ink-faint);
   flex: none;
 }
 
 .source--ok .source__dot {
-  background: var(--ok-glow);
-  box-shadow: 0 0 6px var(--ok-glow);
-}
-
-.source--off .source__dot {
-  background: transparent;
-  border: 1px solid var(--ink-muted);
+  background: var(--ok);
+  box-shadow: 0 0 5px var(--ok-halo);
 }
 
 .source--off {
@@ -571,66 +787,50 @@ body {
   width: 40px;
   height: 4px;
   border-radius: 2px;
-  background: var(--track);
+  background: var(--tank-well);
   overflow: hidden;
 }
 
 .disk__fill {
   display: block;
   height: 100%;
-  background: var(--ink-muted);
+  background: var(--ink-faint);
   border-radius: 2px;
 }
 
 /* ── overlays ────────────────────────────────────────────────── */
 
-.scanlines,
-.vignette {
+.grain {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  display: var(--grain-display);
+  background: var(--grain-bg);
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
 }
 
-.scanlines {
-  display: var(--scanlines-display);
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0) 0px,
-    rgba(0, 0, 0, 0) 2px,
-    rgba(0, 0, 0, 0.16) 3px,
-    rgba(0, 0, 0, 0.16) 4px
-  );
-  mix-blend-mode: multiply;
-}
-
-.vignette {
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 0, 0, 0) 55%,
-    rgba(0, 0, 0, 0.45) 100%
-  );
-}
-
-/* Hidden panels collapse their grid row so the rest expands to fill. */
-.hud[data-hidden-gauges='true'] .hud__gauges,
-.hud[data-hidden-meters='true'] .hud__meters,
-.hud[data-hidden-network='true'] .hud__net,
-.hud[data-hidden-footer='true'] .hud__footer,
-.hud[data-hidden-cores='true'] .cores {
+/* Hidden panels collapse so the rest expands to fill. */
+.hud[data-hidden-gauges='true'] .row-gauges,
+.hud[data-hidden-media='true'] .media,
+.hud[data-hidden-network='true'] .flow,
+.hud[data-hidden-reservoir='true'] .reservoir,
+.hud[data-hidden-cores='true'] .strip,
+.hud[data-hidden-footer='true'] .foot {
   display: none;
 }
 
-/* A stale feed dims rather than blanking — no skeleton flash, no jump. */
+/* A stale feed dims rather than blanking — no skeleton, no layout jump. */
 .hud--stale {
-  opacity: 0.55;
+  opacity: 0.5;
   transition: opacity 400ms linear;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .arc--value,
-  .arc--glow,
-  .meter__fill,
-  .cores__cell i {
+  .dial__needle line,
+  .tank__fill,
+  .strip__cell i,
+  .media__fill {
     transition: none;
   }
 }

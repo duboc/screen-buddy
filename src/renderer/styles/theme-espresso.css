@@ -1,0 +1,157 @@
+/* ── theme: espresso ─────────────────────────────────────────────
+   The panel is meant to read as part of the machine it sits on: warm
+   brushed steel, brass trim, and cream manometer dials.
+
+   How the reading is encoded, in priority order:
+
+     1. NEEDLE POSITION on the dial and the big numeral beside it. This is the
+        real encoding, and it is entirely colour-independent.
+     2. A static printed danger zone on the dial face — a reference band, like
+        a real gauge. It never moves and never changes colour, so it is not
+        carrying a variable.
+     3. Status colour, on the dark body only (lamp, tank fill, thread cells).
+
+   That ordering is deliberate. Amber and red are adjacent hues that collapse
+   under deuteranopia (measured ΔE 1.8 on the cream face), so no live reading
+   is left depending on telling them apart.
+
+   The status ramp is cool-to-hot, which matches what it means. Validated with
+   the data-viz validator against the machine body:
+
+     node scripts/validate_palette.js "#4795c0,#bf8a24,#c2392e" \
+          --mode dark --surface "#17120f" --pairs all
+     → lightness band PASS · chroma floor PASS · CVD separation PASS
+       (worst pair ΔE 12.1 deutan, 16.7 tritan) · normal-vision PASS (18.2) ·
+       contrast vs surface PASS (all ≥ 3:1)
+
+   Network needs no second hue: receive sits above the axis and transmit below
+   on one shared scale, so position plus the labels carry identity and a lone
+   brass stroke does the drawing. */
+
+body[data-theme='espresso'] {
+  color-scheme: dark;
+
+  /* Bahnschrift is the Windows condensed industrial face — it reads like
+     equipment lettering and its digits are narrow enough for big readouts. */
+  --font-ui: 'Bahnschrift', 'Segoe UI Variable Text', 'Segoe UI', system-ui,
+    sans-serif;
+
+  /* machine body */
+  --surface: #17120f;
+  --plate-bg: linear-gradient(177deg, #2a221c 0%, #201a16 42%, #191410 100%);
+  --plate-edge: #3b302697;
+  --plate-sheen: linear-gradient(
+    90deg,
+    transparent,
+    rgba(226, 197, 150, 0.16) 22%,
+    rgba(226, 197, 150, 0.16) 78%,
+    transparent
+  );
+  --plate-shadow: 0 1px 0 rgba(255, 232, 196, 0.05) inset,
+    0 6px 14px rgba(0, 0, 0, 0.45);
+  --plate-radius: 5px;
+  --rule: #3a2f26;
+
+  /* ink */
+  --ink: #f2e7d6;
+  --ink-title: #d9c3a0;
+  --ink-dim: #b3a48f;
+  --ink-muted: #8d7c68;
+  --ink-faint: #5e5145;
+
+  --brass: #c8a05a;
+
+  /* status ramp — validated on the machine body */
+  --mark-nominal: #4795c0;
+  --mark-warn: #bf8a24;
+  --mark-crit: #c2392e;
+
+  /* Slightly lifted steps for the big numerals and the waterline, which are
+     thin marks and text rather than large fills. */
+  --read-nominal: #79bde0;
+  --read-warn: #e0a838;
+  --read-crit: #e05a4c;
+
+  --halo-nominal: rgba(71, 149, 192, 0.5);
+  --halo-warn: rgba(191, 138, 36, 0.5);
+  --halo-crit: rgba(194, 57, 46, 0.55);
+
+  /* dial face — a physical cream manometer */
+  --dial-face: #e8dcc8;
+  --dial-rim: #a08c6e;
+  --dial-ink: #2b221a;
+  --zone-crit: #b3261e;
+  --needle: #b3261e;
+  --needle-hub: #d8c9a8;
+
+  /* vessels & wells */
+  --tank-well: #12100dcc;
+  --tank-edge: #4a3d31;
+  --tank-graduation: #6b5a48;
+  --lamp-well: #14100d;
+  --art-well: #191411;
+
+  --flow-stroke: #c8a05a;
+  --flow-fill: rgba(200, 160, 90, 0.22);
+
+  --ok: #4795c0;
+  --ok-halo: rgba(71, 149, 192, 0.6);
+
+  /* defaults; JS repoints these per element via data-status */
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+  --cell-mark: var(--mark-nominal);
+
+  /* A faint warm grain, so the steel does not read as flat digital black. */
+  --grain-display: block;
+  --grain-opacity: 0.5;
+  --grain-bg: repeating-linear-gradient(
+    92deg,
+    rgba(255, 236, 205, 0.014) 0px,
+    rgba(255, 236, 205, 0.014) 1px,
+    rgba(0, 0, 0, 0.02) 2px,
+    rgba(0, 0, 0, 0.02) 3px
+  );
+}
+
+body[data-theme='espresso'] [data-status='nominal'] {
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+}
+
+body[data-theme='espresso'] [data-status='warn'] {
+  --status-mark: var(--mark-warn);
+  --status-read: var(--read-warn);
+  --status-halo: var(--halo-warn);
+}
+
+body[data-theme='espresso'] [data-status='crit'] {
+  --status-mark: var(--mark-crit);
+  --status-read: var(--read-crit);
+  --status-halo: var(--halo-crit);
+}
+
+/* Thread cells are too small for a numeral, so they stay on the mark layer:
+   three discrete steps, never a continuous ramp. */
+body[data-theme='espresso'] .strip__cell[data-status='nominal'] i {
+  --cell-mark: var(--mark-nominal);
+}
+body[data-theme='espresso'] .strip__cell[data-status='warn'] i {
+  --cell-mark: var(--mark-warn);
+}
+body[data-theme='espresso'] .strip__cell[data-status='crit'] i {
+  --cell-mark: var(--mark-crit);
+}
+
+body[data-theme='espresso'][data-glow='off'] {
+  --halo-nominal: transparent;
+  --halo-warn: transparent;
+  --halo-crit: transparent;
+  --ok-halo: transparent;
+}
+
+body[data-theme='espresso'][data-scanlines='off'] {
+  --grain-display: none;
+}

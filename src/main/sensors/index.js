@@ -4,6 +4,7 @@ const { EventEmitter } = require('node:events');
 const { SystemSource } = require('./system');
 const { NvidiaSource } = require('./nvidia');
 const { LhmSource } = require('./lhm');
+const { NowPlayingSource } = require('./nowplaying');
 
 /**
  * Merges the three sources into one normalized snapshot and emits it on a timer.
@@ -21,6 +22,7 @@ class SensorHub extends EventEmitter {
     this.system = new SystemSource(config.sensors.network);
     this.nvidia = new NvidiaSource(config.sensors.nvidiaSmi);
     this.lhm = new LhmSource(config.sensors.libreHardwareMonitor);
+    this.nowPlaying = new NowPlayingSource(config.sensors.nowPlaying);
     this.fastTimer = null;
     this.slowTimer = null;
     this.lastSnapshot = null;
@@ -28,6 +30,7 @@ class SensorHub extends EventEmitter {
 
   async start() {
     this.nvidia.start();
+    this.nowPlaying.start();
     await this.system.init();
     await Promise.all([this.system.pollFast(), this.lhm.poll()]);
     this.emitSnapshot();
@@ -52,6 +55,7 @@ class SensorHub extends EventEmitter {
     const sys = this.system.read();
     const gpu = this.nvidia.read();
     const lhm = this.lhm.read();
+    const media = this.nowPlaying.read();
 
     const s = sys.data || {};
     const g = gpu.data || {};
@@ -109,6 +113,10 @@ class SensorHub extends EventEmitter {
 
       disks: s.disks ?? [],
 
+      // null when nothing is loaded in any player; the panel shows an idle
+      // state rather than disappearing, so the layout never shifts.
+      media: media.data ?? null,
+
       sys: {
         host: s.host ?? null,
         os: s.os ?? null,
@@ -122,6 +130,7 @@ class SensorHub extends EventEmitter {
         system: { ok: sys.available, reason: sys.reason },
         nvidia: { ok: gpu.available, reason: gpu.reason },
         lhm: { ok: lhm.available, reason: lhm.reason },
+        media: { ok: media.available, reason: media.reason },
       },
     };
   }
@@ -130,6 +139,7 @@ class SensorHub extends EventEmitter {
     if (this.fastTimer) clearInterval(this.fastTimer);
     if (this.slowTimer) clearInterval(this.slowTimer);
     this.nvidia.stop();
+    this.nowPlaying.stop();
   }
 }
 

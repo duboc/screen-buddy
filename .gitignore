@@ -4,6 +4,9 @@ out/
 *.log
 npm-debug.log*
 
+__pycache__/
+*.pyc
+
 # User's local overrides — config.example.json is the tracked template
 config.json
 

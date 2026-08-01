@@ -1,19 +1,15 @@
 import * as f from './format.js';
+import { buildDialFace, needleAngle } from './dial.js';
 
 /* ── constants ─────────────────────────────────────────────────── */
 
-const ARC_RADIUS = 50;
-const ARC_CIRCUMFERENCE = 2 * Math.PI * ARC_RADIUS;
-const ARC_SWEEP = 0.75; // 270 degrees of the circle
-const ARC_LENGTH = ARC_CIRCUMFERENCE * ARC_SWEEP;
-
-const PLOT_W = 480;
-const PLOT_H = 96;
+const PLOT_W = 300;
+const PLOT_H = 52;
 const PLOT_MID = PLOT_H / 2;
-const PLOT_AMPLITUDE = PLOT_MID - 2; // 2px so peaks don't clip the viewBox
+const PLOT_AMPLITUDE = PLOT_MID - 2;
 
-// Floor for the network scale. Without it, an idle link auto-scales a few
-// bytes of background chatter into a dramatic full-height waveform.
+// Floor for the flow scale. Without it, an idle link auto-scales a few bytes
+// of background chatter into a dramatic full-height waveform.
 const NET_SCALE_FLOOR = 256 * 1024;
 
 const STALE_AFTER_MS = 6000;
@@ -27,6 +23,8 @@ const el = {
   uptime: document.getElementById('uptime'),
   clock: document.getElementById('clock'),
   clockSecs: document.getElementById('clock-secs'),
+  lamp: document.getElementById('lamp'),
+  lampText: document.getElementById('lamp-text'),
   cpu: document.getElementById('gauge-cpu'),
   gpu: document.getElementById('gauge-gpu'),
   coresGrid: document.getElementById('cores-grid'),
@@ -42,16 +40,25 @@ const el = {
   netLineTx: document.getElementById('net-line-tx'),
   netPeak: document.getElementById('net-peak'),
   netWindow: document.getElementById('net-window'),
+  mediaApp: document.getElementById('media-app'),
+  mediaState: document.getElementById('media-state'),
+  mediaTitle: document.getElementById('media-title'),
+  mediaArtist: document.getElementById('media-artist'),
+  mediaAlbum: document.getElementById('media-album'),
+  mediaPos: document.getElementById('media-pos'),
+  mediaEnd: document.getElementById('media-end'),
+  mediaFill: document.getElementById('media-fill'),
   sources: document.getElementById('sources'),
   disks: document.getElementById('disks'),
 };
 
-const meters = {};
-for (const node of document.querySelectorAll('.meter')) {
-  meters[node.dataset.meter] = {
+const tanks = {};
+for (const node of document.querySelectorAll('.tank')) {
+  tanks[node.dataset.tank] = {
     root: node,
-    value: node.querySelector('[data-field="value"]'),
-    fill: node.querySelector('.meter__fill'),
+    fill: node.querySelector('.tank__fill'),
+    pct: node.querySelector('[data-field="pct"]'),
+    abs: node.querySelector('[data-field="abs"]'),
   };
 }
 
@@ -61,86 +68,78 @@ let config = null;
 let netHistory = [];
 let coreCells = [];
 let lastSnapshotAt = 0;
+const dialsBuilt = new WeakSet();
 
 /* ── gauges ────────────────────────────────────────────────────── */
 
-/**
- * @param {HTMLElement} root  the .gauge article
- * @param {number|null} value the reading, or null when the sensor is absent
- * @param {{min:number,max:number}} domain
- */
-function renderArc(root, value, domain, status) {
-  const valueArc = root.querySelector('.arc--value');
-  const glowArc = root.querySelector('.arc--glow');
-  const track = root.querySelector('.arc--track');
+/** Domain for a temperature dial, derived from its thresholds. */
+const dialDomain = (thresholds) => ({ min: 20, max: thresholds.crit + 10 });
 
-  track.style.strokeDasharray = `${ARC_LENGTH} ${ARC_CIRCUMFERENCE}`;
+function renderGauge(root, reading, thresholds) {
+  const domain = dialDomain(thresholds);
+  const dial = root.querySelector('[data-dial] svg');
 
-  const frac =
-    value === null || value === undefined || !Number.isFinite(value)
-      ? 0
-      : Math.min(1, Math.max(0, (value - domain.min) / (domain.max - domain.min)));
+  // Ticks, numerals and the printed danger zone depend only on the domain and
+  // thresholds, so they are drawn once and then left alone.
+  if (!dialsBuilt.has(root)) {
+    buildDialFace(dial, domain, thresholds);
+    dialsBuilt.add(root);
+  }
 
-  const len = ARC_LENGTH * frac;
-  const dash = `${len} ${ARC_CIRCUMFERENCE}`;
-  valueArc.style.strokeDasharray = dash;
-  glowArc.style.strokeDasharray = dash;
-
-  // stroke-linecap: round paints a dot even at zero length, which reads as a
-  // real reading pinned to the floor. Hide the arcs outright when there is
-  // nothing to show.
-  const visibility = frac > 0 ? '' : 'hidden';
-  valueArc.style.visibility = visibility;
-  glowArc.style.visibility = visibility;
-
+  const status = f.statusOf(reading.temp, thresholds);
   root.dataset.status = status;
+
+  // A parked needle at the scale minimum would read as a real 20 C reading, so
+  // when the sensor is absent the needle is removed rather than pinned.
+  const needle = root.querySelector('[data-needle]');
+  const hasTemp = Number.isFinite(reading.temp);
+  needle.style.visibility = hasTemp ? '' : 'hidden';
+  if (hasTemp) {
+    needle.firstElementChild.style.transform = `rotate(${needleAngle(
+      reading.temp,
+      domain,
+    )}deg)`;
+  }
+
+  root.querySelector('[data-field="temp"]').textContent = f.celsius(reading.temp);
+  root.querySelector('[data-field="name"]').textContent = reading.name ?? '—';
+  root.querySelector('[data-field="load"]').textContent = f.pct(reading.load);
+  root.querySelector('[data-field="clock"]').textContent = f.clock(reading.clock);
+  root.querySelector('[data-field="power"]').textContent = f.watts(reading.power);
+  root.querySelector('[data-field="fan"]').textContent = reading.fan;
 }
 
-function renderGauge(root, { temp, name, load, clock, power, fan }, thresholds) {
-  const status = f.statusOf(temp, thresholds);
-  renderArc(root, temp, { min: 20, max: thresholds.crit + 10 }, status);
+/* ── reservoir ─────────────────────────────────────────────────── */
 
-  root.querySelector('[data-field="temp"]').textContent = f.celsius(temp);
-  root.querySelector('[data-field="name"]').textContent = name ?? '—';
-  root.querySelector('[data-field="load"]').textContent = f.pct(load);
-  root.querySelector('[data-field="clock"]').textContent = f.clock(clock);
-  root.querySelector('[data-field="power"]').textContent = f.watts(power);
-  root.querySelector('[data-field="fan"]').textContent = fan;
-}
-
-/* ── meters ────────────────────────────────────────────────────── */
-
-function renderMeter(key, { value, pct, thresholds }) {
-  const m = meters[key];
-  if (!m) return;
-  const status = f.statusOf(pct, thresholds);
-  m.root.dataset.status = status;
-  m.value.textContent = value;
-  m.fill.style.width = Number.isFinite(pct)
+function renderTank(key, { pct, abs, thresholds }) {
+  const t = tanks[key];
+  if (!t) return;
+  t.root.dataset.status = f.statusOf(pct, thresholds);
+  t.pct.textContent = f.pct(pct);
+  t.abs.textContent = abs;
+  t.fill.style.height = Number.isFinite(pct)
     ? `${Math.min(100, Math.max(0, pct))}%`
     : '0%';
 }
 
-/* ── core heatmap ──────────────────────────────────────────────── */
+/* ── thread strip ──────────────────────────────────────────────── */
 
 function buildCoreGrid(count) {
   if (coreCells.length === count) return;
   el.coresGrid.replaceChildren();
   coreCells = [];
-
-  const cols = Math.min(8, count);
-  el.coresGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  el.coresGrid.style.gridTemplateRows = `repeat(${Math.ceil(count / cols)}, 1fr)`;
+  // One row: 32 narrow columns read as a bank of indicators across the strip.
+  el.coresGrid.style.gridTemplateColumns = `repeat(${count}, 1fr)`;
 
   for (let i = 0; i < count; i += 1) {
     const cell = document.createElement('div');
-    cell.className = 'cores__cell';
+    cell.className = 'strip__cell';
     const fill = document.createElement('i');
     cell.append(fill);
     el.coresGrid.append(cell);
     coreCells.push({ cell, fill });
   }
-  el.coresCount.textContent = `${count}×`;
+  el.coresCount.textContent = `${count} THREADS`;
 }
 
 function renderCores(loads, thresholds) {
@@ -149,23 +148,15 @@ function renderCores(loads, thresholds) {
   for (let i = 0; i < loads.length; i += 1) {
     const load = Number.isFinite(loads[i]) ? loads[i] : 0;
     const { cell, fill } = coreCells[i];
-    // Floor of 4% so an idle thread still shows a visible baseline tick rather
-    // than an empty cell that reads as "no data".
-    fill.style.height = `${Math.min(100, Math.max(4, load))}%`;
+    // Floor of 5% so an idle thread shows a baseline tick rather than an empty
+    // cell, which would read as "no data".
+    fill.style.height = `${Math.min(100, Math.max(5, load))}%`;
     cell.dataset.status = f.statusOf(load, thresholds);
   }
 }
 
-/* ── network ───────────────────────────────────────────────────── */
+/* ── flow ──────────────────────────────────────────────────────── */
 
-/**
- * Mirrored area plot: receive above the centre line, transmit below.
- *
- * Both arms share ONE scale, so the two halves are directly comparable — this
- * is a mirrored single-axis plot, not two stacked charts with independent
- * y-scales. Series identity comes from position and the direct labels; hue
- * only reinforces it.
- */
 function buildPaths(samples, peak) {
   if (samples.length < 2) return { rxLine: '', rxArea: '', txLine: '', txArea: '' };
 
@@ -219,11 +210,38 @@ function renderNetwork(net) {
 
   el.netIface.textContent = net.iface ?? '';
   el.netPeak.textContent = f.bytesInline(peak, { perSecond: true, digits: 0 });
-
-  const windowSec = Math.round(
+  el.netWindow.textContent = `LAST ${Math.round(
     (netHistory.length * config.polling.fastMs) / 1000,
-  );
-  el.netWindow.textContent = `LAST ${windowSec}s`;
+  )}s`;
+}
+
+/* ── now playing ───────────────────────────────────────────────── */
+
+function renderMedia(media) {
+  if (!media || !media.title) {
+    el.mediaTitle.textContent = 'Nothing playing';
+    el.mediaArtist.textContent = '';
+    el.mediaAlbum.textContent = '';
+    el.mediaApp.textContent = '';
+    el.mediaState.textContent = '';
+    el.mediaPos.textContent = f.DASH;
+    el.mediaEnd.textContent = f.DASH;
+    el.mediaFill.style.width = '0%';
+    return;
+  }
+
+  el.mediaTitle.textContent = media.title;
+  el.mediaArtist.textContent = media.artist ?? '';
+  el.mediaAlbum.textContent = media.album ?? '';
+  el.mediaApp.textContent = media.app ?? '';
+  el.mediaState.textContent = media.playing ? 'PLAYING' : 'PAUSED';
+
+  el.mediaPos.textContent = f.mmss(media.posSec);
+  el.mediaEnd.textContent = f.mmss(media.endSec);
+  el.mediaFill.style.width =
+    media.endSec && media.posSec !== null
+      ? `${Math.min(100, (media.posSec / media.endSec) * 100)}%`
+      : '0%';
 }
 
 /* ── footer ────────────────────────────────────────────────────── */
@@ -232,6 +250,7 @@ const SOURCE_LABELS = {
   system: 'system',
   nvidia: 'nvidia-smi',
   lhm: 'lhm',
+  media: 'media',
 };
 
 function renderSources(sources) {
@@ -245,8 +264,6 @@ function renderSources(sources) {
     dot.className = 'source__dot';
     node.append(dot, document.createTextNode(label));
 
-    // An offline source states why, so a blank field reads as a setup gap
-    // rather than a broken panel.
     if (!s.ok && s.reason) {
       const reason = document.createElement('span');
       reason.className = 'source__reason';
@@ -283,6 +300,25 @@ function renderDisks(disks) {
   el.disks.replaceChildren(frag);
 }
 
+/* ── ready lamp ────────────────────────────────────────────────── */
+
+const LAMP_WORDS = { nominal: 'READY', warn: 'HEATING', crit: 'OVER TEMP' };
+
+/** Worst of the two temperature readings drives the machine's ready lamp. */
+function renderLamp(snapshot, thresholds) {
+  const states = [
+    f.statusOf(snapshot.cpu.tempC, thresholds.cpuTemp),
+    f.statusOf(snapshot.gpu.tempC, thresholds.gpuTemp),
+  ];
+  const worst = states.includes('crit')
+    ? 'crit'
+    : states.includes('warn')
+      ? 'warn'
+      : 'nominal';
+  el.lamp.dataset.status = worst;
+  el.lampText.textContent = LAMP_WORDS[worst];
+}
+
 /* ── clock ─────────────────────────────────────────────────────── */
 
 function renderClock() {
@@ -290,8 +326,7 @@ function renderClock() {
   const h = config.ui.clock24h
     ? String(now.getHours()).padStart(2, '0')
     : String(now.getHours() % 12 || 12);
-  const m = String(now.getMinutes()).padStart(2, '0');
-  el.clock.textContent = `${h}:${m}`;
+  el.clock.textContent = `${h}:${String(now.getMinutes()).padStart(2, '0')}`;
   el.clockSecs.textContent = config.ui.showSeconds
     ? String(now.getSeconds()).padStart(2, '0')
     : '';
@@ -308,6 +343,8 @@ function render(s) {
   el.host.textContent = s.sys.host ?? '—';
   el.os.textContent = s.sys.os ?? '';
   el.uptime.textContent = f.duration(s.sys.uptimeSec);
+
+  renderLamp(s, t);
 
   renderGauge(
     el.cpu,
@@ -335,35 +372,27 @@ function render(s) {
     t.gpuTemp,
   );
 
+  if (config.ui.panels.reservoir) {
+    renderTank('mem', {
+      pct: s.mem.pct,
+      abs: f.memPair(s.mem.usedBytes, s.mem.totalBytes),
+      thresholds: t.memory,
+    });
+
+    const vramPct =
+      Number.isFinite(s.gpu.memUsedMB) && s.gpu.memTotalMB
+        ? (s.gpu.memUsedMB / s.gpu.memTotalMB) * 100
+        : null;
+    renderTank('vram', {
+      pct: vramPct,
+      abs: f.mbPair(s.gpu.memUsedMB, s.gpu.memTotalMB),
+      thresholds: t.memory,
+    });
+  }
+
   if (config.ui.panels.cores) renderCores(s.cpu.coreLoads, t.load);
-
-  renderMeter('cpu', {
-    value: f.pct(s.cpu.load, 1),
-    pct: s.cpu.load,
-    thresholds: t.load,
-  });
-  renderMeter('gpu', {
-    value: f.pct(s.gpu.load),
-    pct: s.gpu.load,
-    thresholds: t.load,
-  });
-  renderMeter('mem', {
-    value: f.memPair(s.mem.usedBytes, s.mem.totalBytes),
-    pct: s.mem.pct,
-    thresholds: t.memory,
-  });
-
-  const vramPct =
-    Number.isFinite(s.gpu.memUsedMB) && s.gpu.memTotalMB
-      ? (s.gpu.memUsedMB / s.gpu.memTotalMB) * 100
-      : null;
-  renderMeter('vram', {
-    value: f.mbPair(s.gpu.memUsedMB, s.gpu.memTotalMB),
-    pct: vramPct,
-    thresholds: t.memory,
-  });
-
   if (config.ui.panels.network) renderNetwork(s.net);
+  if (config.ui.panels.media) renderMedia(s.media);
   if (config.ui.panels.footer) {
     renderSources(s.sources);
     renderDisks(s.disks ?? []);
@@ -373,9 +402,9 @@ function render(s) {
 /* ── boot ──────────────────────────────────────────────────────── */
 
 function applyUiConfig() {
+  document.body.dataset.theme = config.theme || 'espresso';
   document.body.dataset.glow = config.ui.glow ? 'on' : 'off';
   document.body.dataset.scanlines = config.ui.scanlines ? 'on' : 'off';
-  document.body.dataset.theme = config.theme || 'neon';
   for (const [panel, visible] of Object.entries(config.ui.panels)) {
     el.hud.dataset[`hidden${panel[0].toUpperCase()}${panel.slice(1)}`] = String(
       !visible,
@@ -390,8 +419,8 @@ async function boot() {
   renderClock();
   setInterval(renderClock, 250);
 
-  // A dead feed dims the panel instead of freezing on stale numbers that look
-  // live. No skeleton, no layout jump — just an unmistakable drop in contrast.
+  // A dead feed dims the panel instead of freezing on stale numbers that still
+  // look live. No skeleton, no layout jump.
   setInterval(() => {
     if (lastSnapshotAt && Date.now() - lastSnapshotAt > STALE_AFTER_MS) {
       el.hud.classList.add('hud--stale');
