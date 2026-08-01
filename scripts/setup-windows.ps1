@@ -144,8 +144,10 @@ if ($HideTaskbar) {
 if ($AutoStart) {
     Write-Step 'Configuring autostart at login'
 
-    $npm = (Get-Command npm.cmd -ErrorAction SilentlyContinue)?.Source
-    if (-not $npm) { $npm = (Get-Command npm -ErrorAction SilentlyContinue)?.Source }
+    # No null-conditional (?.) here: this script has to parse under Windows
+    # PowerShell 5.1, which does not support it.
+    $npm = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+    if (-not $npm) { $npm = (Get-Command npm -ErrorAction SilentlyContinue).Source }
     if (-not $npm) {
         Write-Warn 'npm not found on PATH; skipping autostart'
     } else {
