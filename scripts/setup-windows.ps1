@@ -59,6 +59,28 @@ function Test-Admin {
         [Security.Principal.WindowsBuiltinRole]::Administrator)
 }
 
+function Find-Lhm {
+    # winget ships LibreHardwareMonitor as a PORTABLE package, so it does not
+    # land in Program Files at all — it goes under the WinGet package store.
+    # Checking only the conventional install directories reports "not
+    # installed" for a perfectly good install.
+    $fixed = @(
+        "$env:ProgramFiles\LibreHardwareMonitor\LibreHardwareMonitor.exe",
+        "${env:ProgramFiles(x86)}\LibreHardwareMonitor\LibreHardwareMonitor.exe",
+        "$env:LOCALAPPDATA\Programs\LibreHardwareMonitor\LibreHardwareMonitor.exe"
+    )
+    foreach ($p in $fixed) { if (Test-Path $p) { return $p } }
+
+    foreach ($store in @("$env:LOCALAPPDATA\Microsoft\WinGet\Packages",
+                         "$env:ProgramFiles\WinGet\Packages")) {
+        if (-not (Test-Path $store)) { continue }
+        $hit = Get-ChildItem $store -Recurse -Filter 'LibreHardwareMonitor.exe' `
+                   -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($hit) { return $hit.FullName }
+    }
+    return $null
+}
+
 # ── report ───────────────────────────────────────────────────────────────
 
 Write-Step 'Current state'
@@ -73,11 +95,7 @@ if ($null -eq $mmValue -or $mmValue -eq 1) {
 $runEntry = (Get-ItemProperty -Path $RunKey -Name $RunValue -ErrorAction SilentlyContinue).$RunValue
 if ($runEntry) { Write-Ok "Autostart: $runEntry" } else { Write-Info 'Autostart: not configured' }
 
-$lhmInstalled = @(
-    "$env:ProgramFiles\LibreHardwareMonitor\LibreHardwareMonitor.exe",
-    "${env:ProgramFiles(x86)}\LibreHardwareMonitor\LibreHardwareMonitor.exe",
-    "$env:LOCALAPPDATA\Programs\LibreHardwareMonitor\LibreHardwareMonitor.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
+$lhmInstalled = Find-Lhm
 
 if ($lhmInstalled) { Write-Ok "LibreHardwareMonitor: $lhmInstalled" }
 else { Write-Info 'LibreHardwareMonitor: not installed (CPU temp/power will read "--")' }
@@ -163,17 +181,50 @@ if ($AutoStart) {
 
 # ── LibreHardwareMonitor ─────────────────────────────────────────────────
 
-if ($InstallLhm -and -not $lhmInstalled) {
-    Write-Step 'Installing LibreHardwareMonitor'
-    if ($PSCmdlet.ShouldProcess('LibreHardwareMonitor', 'winget install')) {
-        winget install --id LibreHardwareMonitor.LibreHardwareMonitor --exact `
-            --accept-package-agreements --accept-source-agreements --disable-interactivity
-        Write-Ok 'Installed'
-        Write-Info 'Now open it once and tick Options > Remote Web Server > Run,'
-        Write-Info 'and Options > Start Minimized. The port must stay 8085.'
+if ($InstallLhm) {
+    if ($lhmInstalled) {
+        Write-Step 'LibreHardwareMonitor'
+        Write-Info "Already installed at $lhmInstalled; skipping"
+    } else {
+        Write-Step 'Installing LibreHardwareMonitor'
+        # No --disable-interactivity: this needs elevation for its PawnIO
+        # dependency, and suppressing the prompt just makes it fail with
+        # "cancelled by user". Let the UAC dialog through.
+        if ($PSCmdlet.ShouldProcess('LibreHardwareMonitor', 'winget install')) {
+            winget install --id LibreHardwareMonitor.LibreHardwareMonitor --exact `
+                --accept-package-agreements --accept-source-agreements
+            $lhmInstalled = Find-Lhm
+            if ($lhmInstalled) { Write-Ok "Installed at $lhmInstalled" }
+            else { Write-Warn 'Install did not complete (was the UAC prompt approved?)' }
+        }
     }
-} elseif ($InstallLhm) {
-    Write-Info 'LibreHardwareMonitor already installed; skipping'
+}
+
+# Pre-seed LHM's settings so the web server is already on at first launch,
+# instead of requiring a trip through Options > Remote Web Server > Run.
+# LHM writes this file itself on exit; it only reads ours if it has never run.
+if ($InstallLhm -or $LhmAutoStart) {
+    $exe = if ($lhmInstalled) { $lhmInstalled } else { Find-Lhm }
+    if ($exe) {
+        $cfg = Join-Path (Split-Path -Parent $exe) 'LibreHardwareMonitor.config'
+        if (Test-Path $cfg) {
+            Write-Info 'LHM already has a config; leaving its settings alone'
+        } elseif ($PSCmdlet.ShouldProcess($cfg, 'seed settings')) {
+            @'
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <appSettings>
+    <add key="runWebServerMenuItem" value="true" />
+    <add key="listenerPort" value="8085" />
+    <add key="startMinMenuItem" value="true" />
+    <add key="minTrayMenuItem" value="true" />
+    <add key="minCloseMenuItem" value="true" />
+  </appSettings>
+</configuration>
+'@ | Set-Content -Path $cfg -Encoding UTF8
+            Write-Ok 'Seeded LHM config: web server on, port 8085, starts minimised'
+        }
+    }
 }
 
 if ($LhmAutoStart) {
@@ -184,20 +235,17 @@ if ($LhmAutoStart) {
         Write-Warn 'Re-run this script from an Administrator PowerShell to set it up.'
     } else {
         $exe = $lhmInstalled
-        if (-not $exe) {
-            $exe = @(
-                "$env:ProgramFiles\LibreHardwareMonitor\LibreHardwareMonitor.exe",
-                "${env:ProgramFiles(x86)}\LibreHardwareMonitor\LibreHardwareMonitor.exe",
-                "$env:LOCALAPPDATA\Programs\LibreHardwareMonitor\LibreHardwareMonitor.exe"
-            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-        }
+        if (-not $exe) { $exe = Find-Lhm }
 
         if (-not $exe) {
             Write-Warn 'LibreHardwareMonitor not found; install it first (-InstallLhm)'
         } elseif ($PSCmdlet.ShouldProcess($TaskName, 'register scheduled task')) {
             # RunLevel Highest is the point: unelevated, LHM silently reports far
             # fewer sensors and CPU package temp is simply absent.
-            $action    = New-ScheduledTaskAction -Execute $exe
+            # WorkingDirectory matters: the winget build is portable and keeps
+            # its config and DLLs beside the exe.
+            $action    = New-ScheduledTaskAction -Execute $exe `
+                            -WorkingDirectory (Split-Path -Parent $exe)
             $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
             $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
                             -LogonType Interactive -RunLevel Highest

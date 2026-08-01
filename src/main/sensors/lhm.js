@@ -15,12 +15,46 @@
  * unavailable and the HUD renders those fields as "--".
  */
 
-/** LHM values arrive as display strings: "45.5 °C", "142.3 W", "4,823.1 MHz". */
+/**
+ * LHM formats its values for display using the machine's locale, so the same
+ * sensor reads "63.9 °C" on en-US and "63,9 °C" on pt-BR or de-DE — and with
+ * grouping, "5,530.0 MHz" versus "5.530,0 MHz".
+ *
+ * Assuming a comma is always a thousands separator is therefore wrong, and
+ * wrong in the worst way: "63,9 °C" silently becomes 639 °C, and "109,9 W"
+ * becomes 1099 W. The numbers stay plausible-looking enough to render.
+ *
+ * So detect the decimal separator from the runtime's own locale — LHM (.NET)
+ * and Electron (ICU) both follow the Windows user locale — then treat the other
+ * separator as grouping and discard it.
+ */
+const DECIMAL_SEPARATOR = (() => {
+  try {
+    const part = new Intl.NumberFormat()
+      .formatToParts(1.1)
+      .find((p) => p.type === 'decimal');
+    return part ? part.value : '.';
+  } catch {
+    return '.';
+  }
+})();
+
+const GROUP_SEPARATOR = DECIMAL_SEPARATOR === ',' ? '.' : ',';
+
 function parseValue(raw) {
   if (typeof raw !== 'string') return null;
-  const m = raw.replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+
+  // Grab the numeric run, allowing either separator and any spacing inside it.
+  const m = raw.match(/-?[\d.,   ]*\d/);
   if (!m) return null;
-  const v = Number.parseFloat(m[0]);
+
+  const normalized = m[0]
+    .split(GROUP_SEPARATOR)
+    .join('')
+    .replace(/[\s  ]/g, '')
+    .replace(DECIMAL_SEPARATOR, '.');
+
+  const v = Number.parseFloat(normalized);
   return Number.isFinite(v) ? v : null;
 }
 
