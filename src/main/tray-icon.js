@@ -1,0 +1,15 @@
+'use strict';
+
+/**
+ * Tray icon, inlined as a data URL.
+ *
+ * Kept as source rather than a binary asset so the repo stays text-only and the
+ * icon survives packaging without an extraResources rule. It is a 32x32 RGBA
+ * PNG: a cyan-to-magenta gauge ring with a needle, matching the HUD's motif.
+ * Regenerate with scripts/make-tray-icon.py if you want to restyle it.
+ */
+const TRAY_ICON_DATA_URL =
+  'data:image/png;base64,' +
+  'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAD10lEQVR42u2X+XMTZRzG+7cwCuPoOC5RxBkYrRAOJQIeBOQWKQQEiyLMcCg0FjuFcAsKdNEOWodyaY80rVCabs+0UDZt0rRJK/ZkG6Cl0gPYPn7fsGinu01z8YvjO/P5ZfO++zzf5/vu7pu4uP9HGANTsvWEhRAIiZAVJOUa+03/NIRNhJtAiLC5plgI65TKECFsrS5ScaMSL6KE3cMYiXiwm4oET5gVeOVasDXGcGIfrXImxAVZyylzRktCF4oBrZ77CUMYCRqUNao9Ecpu1xLnQhXPvg8wlDS0TJiCGdB61AzhijOGJaF6RDUXy1Nz9Fo9j1R8WFFae0L9shqIz7U8eCMXD1/PAZl5MpELV1zDAKdhwKK6Sa8+T/hreh76plnR/6YVg/G5YrjVB2mtOOZmvDM7X7o7y4ZuxkwbembY+GiiH6MNkmrSLUOBTEBizAlgjkX1igHzyHeCalLr/MsygRbGu4wrMTMwrgNmAsNQG2j+oFBqWlAIH+E1XkXjwqt8rL6mJMiPMKBuQcOiIsHzYRHci4vgWmJH7VK7GEMD4ggD6k1Yt9RucS4rhri8GDUrBVz7qASOj0u5aMWfbRviRogz1I8hieqZaNWqElSuLkXZmjII68qjbsMLzY/45/6UMb51CM+0Dz0xoH1qqkgodTPhElM57J9U4MrGSuRvchgiFZ9UP2CY2PgAL/oe4vk/HoEZmdAiu0ddQMIm+/oKFG6oxO+JDtg+r0L2lmr/xW3Xw25F/PX73BRnn/9V1wBe9gziJS8ZaQoYCX5Uo6qFgk0OWAPi10DiOPvlDf+ZJGfISbxd1mOY4ej1kwmQCUx29eOV+kFQGsKYi/M/q9JZN1fLWVsfi2fuvIGfd4v4IbkWJ1Jd/JEDnlHTWJLfxS0ovM3PE7rxVnkP9FW9YCamin14ra5fnuQeCO18SOLGx+I1yNglIv3rWqSl1OH4PjcOHfIg9ZhXNJ9q4nek3zRvzmgxbzjfzidkdYrL8yQsuuzHe0V38E5JN2ZX3BtuIrxz4bkdNcZfvhLlM2YnTu+pY9Xj6P56HDjSgJTvvEhKa8L29Jv4IqMFG8+1Ye2vHViZK2FxQRcoBcwvvos5pT2YVXlPnl7da4xoF/+U5NT9mFwrnEpxBao/fNADy9FGfPO9D7vTmv8x8CkZMF3qwKqcW1hm6wqk8D6lMFfoFmg/6KJ+k1H1pm/317sPHm7A3mON2HPCh138vwYSM9uw7mIHVmd1YoWVpeB3UwqmuFgPil+fetxrST7pE8iARAZkMiAnZrZK6y+0Cwm/dVqoDbH/a/afHn8DKRCaiAx8I7wAAAAASUVORK5CYII=';
+
+module.exports = { TRAY_ICON_DATA_URL };

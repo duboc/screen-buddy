@@ -1,0 +1,36 @@
+{
+  "name": "screen-buddy",
+  "version": "0.1.0",
+  "description": "A dedicated system-stats HUD for a secondary display. Borderless, always-on-top, out of the way.",
+  "main": "src/main/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "windowed": "electron . --windowed",
+    "probe": "node scripts/probe-sensors.js",
+    "displays": "electron scripts/list-displays.js"
+  },
+  "keywords": [
+    "hud",
+    "system-monitor",
+    "sensor-panel",
+    "electron",
+    "windows"
+  ],
+  "author": "duboc",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/duboc/screen-buddy.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "systeminformation": "^5.23.5"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

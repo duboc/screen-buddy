@@ -1,0 +1,139 @@
+/* ── theme: neon ─────────────────────────────────────────────────
+   Cyan → amber → magenta status ramp on a near-black surface.
+
+   Two colour layers, and the split is deliberate:
+
+   MARK layer (--status-mark, --net-*-fill, --cell-mark) carries the data.
+   These are the validated steps. Checked with the data-viz validator against
+   this exact surface (#04070d):
+
+     node scripts/validate_palette.js "#0e9fb6,#c4841a,#e0247f,#7d5fe0" \
+          --mode dark --surface "#04070d" --pairs all
+     → lightness band PASS · chroma floor PASS · CVD separation PASS
+       (worst all-pairs ΔE 8.6 deutan) · normal-vision PASS (20.6) ·
+       contrast vs surface PASS (all ≥ 3:1)
+
+   GLOW layer (--status-glow, --*-glow, --status-halo) is decoration: thin
+   2px inner strokes, text colour and CSS shadows. It always duplicates a mark
+   that is already drawn and always sits beside a numeral, so it never encodes
+   anything by itself. Those brighter steps sit above the dark-mode lightness
+   band on purpose — on a 5-inch panel read from across a desk the lift is
+   what makes the numbers legible, and it is applied to hairlines and text
+   rather than to large fills, which is where the band's glare concern bites.
+
+   Status colours here mean state (nominal / warning / critical) and are never
+   reused as series identity. The network series are separated by position
+   (receive above the axis, transmit below) and by direct labels; hue only
+   reinforces. */
+
+body[data-theme='neon'] {
+  color-scheme: dark;
+
+  --font-ui: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system,
+    sans-serif;
+
+  /* surfaces & ink */
+  --surface: #04070d;
+  --panel: #070c15;
+  --track: #131c2b;
+  --rule: #1b2637;
+  --grid: #101a28;
+  --ink-primary: #e6f2f7;
+  --ink-secondary: #93a7bb;
+  --ink-muted: #5d7186;
+  --ink-faint: #3d4d5e;
+
+  /* status ramp — mark layer (validated) */
+  --mark-nominal: #0e9fb6;
+  --mark-warn: #c4841a;
+  --mark-crit: #e0247f;
+
+  /* status ramp — glow layer (decorative) */
+  --glow-nominal: #22e7ff;
+  --glow-warn: #ffb02e;
+  --glow-crit: #ff2d95;
+
+  /* halos are the glow hue at low alpha; shadows only */
+  --halo-nominal: rgba(34, 231, 255, 0.42);
+  --halo-warn: rgba(255, 176, 46, 0.42);
+  --halo-crit: rgba(255, 45, 149, 0.45);
+
+  /* network series */
+  --net-rx-glow: #22e7ff;
+  --net-rx-fill: rgba(14, 159, 182, 0.3);
+  --net-tx-glow: #a98bff;
+  --net-tx-fill: rgba(125, 95, 224, 0.3);
+
+  --ok-glow: #22e7ff;
+  --accent-glow: #22e7ff;
+
+  /* Defaults; JS re-points these per element via the data-status attribute. */
+  --status-mark: var(--mark-nominal);
+  --status-glow: var(--glow-nominal);
+  --status-halo: var(--halo-nominal);
+  --cell-mark: var(--mark-nominal);
+
+  --glow-opacity: 1;
+  --scanlines-display: block;
+}
+
+/* Status is set as an attribute on whichever element owns the reading, so a
+   single rule set repoints all three custom properties at once. */
+[data-status='nominal'] {
+  --status-mark: var(--mark-nominal);
+  --status-glow: var(--glow-nominal);
+  --status-halo: var(--halo-nominal);
+}
+
+[data-status='warn'] {
+  --status-mark: var(--mark-warn);
+  --status-glow: var(--glow-warn);
+  --status-halo: var(--halo-warn);
+}
+
+[data-status='crit'] {
+  --status-mark: var(--mark-crit);
+  --status-glow: var(--glow-crit);
+  --status-halo: var(--halo-crit);
+}
+
+/* Core cells are too small for a numeral, so they stay on the mark layer
+   only — three discrete steps, not a continuous ramp, matching the legend. */
+.cores__cell[data-status='nominal'] i {
+  --cell-mark: var(--mark-nominal);
+}
+
+.cores__cell[data-status='warn'] i {
+  --cell-mark: var(--mark-warn);
+}
+
+.cores__cell[data-status='crit'] i {
+  --cell-mark: var(--mark-crit);
+}
+
+.cores__swatch--low {
+  background: var(--mark-nominal);
+}
+
+.cores__swatch--mid {
+  background: var(--mark-warn);
+}
+
+.cores__swatch--high {
+  background: var(--mark-crit);
+}
+
+/* Config toggles, applied to <body> by the renderer. */
+body[data-glow='off'] {
+  --glow-opacity: 0;
+}
+
+body[data-glow='off'] .gauge__value,
+body[data-glow='off'] .meter__fill {
+  text-shadow: none;
+  box-shadow: none;
+}
+
+body[data-scanlines='off'] {
+  --scanlines-display: none;
+}

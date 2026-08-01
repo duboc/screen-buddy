@@ -1,0 +1,11 @@
+node_modules/
+dist/
+out/
+*.log
+npm-debug.log*
+
+# User's local overrides — config.example.json is the tracked template
+config.json
+
+.DS_Store
+Thumbs.db

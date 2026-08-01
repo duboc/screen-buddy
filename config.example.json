@@ -1,0 +1,77 @@
+{
+  "$comment": "Copy to config.json and edit. config.json is gitignored, so your local tweaks stay yours. Anything you omit falls back to these defaults.",
+
+  "display": {
+    "$comment": "How to pick which monitor the HUD lands on. strategy: 'bounds' matches the monitor whose top-left corner is at bounds.x/bounds.y; 'smallest' picks the lowest-resolution monitor; 'index' uses the Nth monitor as Electron enumerates them; 'primary' uses the main one. If the chosen strategy finds nothing, 'fallback' is tried.",
+    "strategy": "bounds",
+    "bounds": { "x": 2560, "y": 444 },
+    "index": 0,
+    "fallback": "smallest"
+  },
+
+  "window": {
+    "$comment": "clickThrough makes the HUD ignore the mouse entirely — clicks pass through to whatever is underneath, so you can never accidentally focus or drag it. Turn it off if you want the interactive panel-cycling clicks.",
+    "frame": false,
+    "alwaysOnTop": true,
+    "alwaysOnTopLevel": "screen-saver",
+    "skipTaskbar": true,
+    "clickThrough": true,
+    "focusable": false,
+    "fillDisplay": true,
+    "opacity": 1.0
+  },
+
+  "polling": {
+    "$comment": "fastMs drives load/temp/clock/network. slowMs drives things that barely change (disk capacity, uptime, process count).",
+    "fastMs": 1000,
+    "slowMs": 5000
+  },
+
+  "sensors": {
+    "nvidiaSmi": {
+      "$comment": "NVIDIA GPU telemetry. Works without admin. Set path if nvidia-smi.exe is not on PATH.",
+      "enabled": true,
+      "path": "nvidia-smi"
+    },
+    "libreHardwareMonitor": {
+      "$comment": "OPTIONAL. Unlocks AMD CPU package temp, CPU power draw, fan RPM and motherboard sensors, which Windows will not report on its own. Install LibreHardwareMonitor, enable Options > Remote Web Server > Run, and run it as Administrator. The HUD works fine without it — those fields just read '--'.",
+      "enabled": true,
+      "url": "http://127.0.0.1:8085/data.json",
+      "timeoutMs": 1500
+    },
+    "network": {
+      "$comment": "Leave interface null to auto-pick the busiest non-loopback adapter.",
+      "interface": null
+    }
+  },
+
+  "theme": "neon",
+
+  "ui": {
+    "showSeconds": true,
+    "clock24h": true,
+    "scanlines": true,
+    "glow": true,
+    "historySamples": 120,
+    "panels": {
+      "gauges": true,
+      "meters": true,
+      "network": true,
+      "cores": true,
+      "footer": true
+    }
+  },
+
+  "thresholds": {
+    "$comment": "Drives the colour shift from cyan through amber to magenta. Celsius, percent, watts.",
+    "cpuTemp": { "warn": 75, "crit": 90 },
+    "gpuTemp": { "warn": 72, "crit": 85 },
+    "load": { "warn": 70, "crit": 90 },
+    "memory": { "warn": 75, "crit": 90 }
+  },
+
+  "power": {
+    "$comment": "Holds off the display-sleep timer so the HUD monitor stays lit and Windows never reshuffles your windows off it.",
+    "preventDisplaySleep": true
+  }
+}
