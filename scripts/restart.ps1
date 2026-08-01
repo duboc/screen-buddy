@@ -43,9 +43,15 @@ if ($running.Count -gt 0) {
     Write-Host 'screen-buddy was not running.' -ForegroundColor Gray
 }
 
-# The media helper is a child powershell.exe; if it outlived its parent, clear it.
+# The media and network helpers are child powershell.exe processes. A force-kill
+# of Electron never runs its before-quit handler, so they outlive it; clear any
+# that were orphaned.
+$helpers = 'nowplaying-loop.ps1', 'netstats-loop.ps1'
 Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -and $_.CommandLine -like '*nowplaying-loop.ps1*' } |
+    Where-Object {
+        $cmd = $_.CommandLine
+        $cmd -and ($helpers | Where-Object { $cmd -like "*$_*" })
+    } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 if ($StopOnly) {

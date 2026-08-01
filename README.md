@@ -105,10 +105,25 @@ are live.
 
 | Source | Provides | Needs |
 |---|---|---|
-| `systeminformation` | CPU load & per-thread load, memory, network, disks, uptime | nothing |
+| `systeminformation` | CPU load & per-thread load, memory, disks, uptime | nothing |
 | `nvidia-smi` | GPU temp, load, clocks, power, VRAM, fan | NVIDIA driver |
+| `Get-NetAdapterStatistics` | Network throughput per adapter | nothing |
 | Windows media session | Now-playing track, artist, album, position, play state | nothing |
 | LibreHardwareMonitor | **CPU temp, CPU power, fan RPM, mobo temp** | LHM running elevated |
+
+### Why network does not use systeminformation
+
+Its `networkStats()` cannot read adapters whose name contains a space. On a
+machine with an adapter called `Wi-Fi 6` it reports `rx_bytes: 0` and
+`operstate: unknown` for the real, active adapter — while happily reporting the
+counters of a *disconnected* adapter called `Wi-Fi`, because the shorter name is
+a prefix of the longer one. The panel showed a permanent 0 B/s.
+
+`Get-NetAdapterStatistics` is the OS's own accounting and has no such problem. A
+long-lived PowerShell helper streams cumulative byte counters; rates are derived
+from the deltas. Adapter choice is automatic — the busiest adapter reporting
+`Up`, with hysteresis so an idle machine does not flip between two of them — or
+pin one by name with `sensors.network.interface`.
 
 Only the last is optional-with-setup, and it exists for one reason: **Windows has
 no public API for AMD/Intel desktop CPU package temperature.**

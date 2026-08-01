@@ -251,6 +251,7 @@ const SOURCE_LABELS = {
   nvidia: 'nvidia-smi',
   lhm: 'lhm',
   media: 'media',
+  net: 'net',
 };
 
 function renderSources(sources) {

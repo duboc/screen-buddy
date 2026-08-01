@@ -40,7 +40,7 @@
       "timeoutMs": 1500
     },
     "network": {
-      "$comment": "Leave interface null to auto-pick the busiest non-loopback adapter.",
+      "$comment": "Read via Get-NetAdapterStatistics, not systeminformation, which silently reports zero for adapters whose name contains a space. Leave interface null to auto-pick the busiest adapter that reports Up; set it to an exact adapter name (as shown by Get-NetAdapter) to pin one.",
       "interface": null
     },
     "nowPlaying": {

@@ -5,6 +5,7 @@ const { SystemSource } = require('./system');
 const { NvidiaSource } = require('./nvidia');
 const { LhmSource } = require('./lhm');
 const { NowPlayingSource } = require('./nowplaying');
+const { NetStatsSource } = require('./netstats');
 
 /**
  * Merges the three sources into one normalized snapshot and emits it on a timer.
@@ -23,6 +24,10 @@ class SensorHub extends EventEmitter {
     this.nvidia = new NvidiaSource(config.sensors.nvidiaSmi);
     this.lhm = new LhmSource(config.sensors.libreHardwareMonitor);
     this.nowPlaying = new NowPlayingSource(config.sensors.nowPlaying);
+    this.netStats = new NetStatsSource({
+      ...config.sensors.network,
+      intervalMs: config.polling.fastMs,
+    });
     this.fastTimer = null;
     this.slowTimer = null;
     this.lastSnapshot = null;
@@ -31,6 +36,7 @@ class SensorHub extends EventEmitter {
   async start() {
     this.nvidia.start();
     this.nowPlaying.start();
+    this.netStats.start();
     await this.system.init();
     await Promise.all([this.system.pollFast(), this.lhm.poll()]);
     this.emitSnapshot();
@@ -56,6 +62,7 @@ class SensorHub extends EventEmitter {
     const gpu = this.nvidia.read();
     const lhm = this.lhm.read();
     const media = this.nowPlaying.read();
+    const net = this.netStats.read();
 
     const s = sys.data || {};
     const g = gpu.data || {};
@@ -105,11 +112,20 @@ class SensorHub extends EventEmitter {
         swapTotalBytes: s.swapTotalBytes ?? null,
       },
 
-      net: {
-        iface: s.netIface ?? null,
-        rxBps: s.netRxBps ?? null,
-        txBps: s.netTxBps ?? null,
-      },
+      // Get-NetAdapterStatistics is authoritative; systeminformation is only a
+      // fallback for when the helper has not produced a sample yet, and it
+      // silently reports zero for any adapter whose name contains a space.
+      net: net.available
+        ? {
+            iface: net.data.iface,
+            rxBps: net.data.rxBps,
+            txBps: net.data.txBps,
+          }
+        : {
+            iface: s.netIface ?? null,
+            rxBps: s.netRxBps ?? null,
+            txBps: s.netTxBps ?? null,
+          },
 
       disks: s.disks ?? [],
 
@@ -131,6 +147,7 @@ class SensorHub extends EventEmitter {
         nvidia: { ok: gpu.available, reason: gpu.reason },
         lhm: { ok: lhm.available, reason: lhm.reason },
         media: { ok: media.available, reason: media.reason },
+        net: { ok: net.available, reason: net.reason },
       },
     };
   }
@@ -140,6 +157,7 @@ class SensorHub extends EventEmitter {
     if (this.slowTimer) clearInterval(this.slowTimer);
     this.nvidia.stop();
     this.nowPlaying.stop();
+    this.netStats.stop();
   }
 }
 
