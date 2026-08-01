@@ -8,8 +8,13 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "windowed": "electron . --windowed",
+    "setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1",
+    "doctor": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/doctor.ps1",
+    "restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/restart.ps1",
+    "shortcut": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-shortcut.ps1",
     "probe": "node scripts/probe-sensors.js",
-    "displays": "electron scripts/list-displays.js"
+    "displays": "electron scripts/list-displays.js",
+    "init-config": "electron scripts/init-config.js"
   },
   "keywords": [
     "hud",

@@ -5,7 +5,7 @@
 .DESCRIPTION
   Stops any running instance and starts a fresh one, hidden.
 
-  Deliberately does NOT kill electron.exe by name — VS Code, Discord, Slack and
+  Deliberately does NOT kill electron.exe by name - VS Code, Discord, Slack and
   plenty of other apps are Electron too, and a name match would take them all
   down. Instead it matches on the command line containing this project's own
   path, so only this app's processes are touched.

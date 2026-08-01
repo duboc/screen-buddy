@@ -87,7 +87,7 @@ function pickFirst(sensors, predicates) {
 
 const isCpuNode = (s) => /\/(amdcpu|intelcpu|cpu)\/\d+\//i.test(s.id);
 
-function extract(sensors) {
+function extract(sensors, { fanSensor = null } = {}) {
   const cpuTemp = pickFirst(sensors, [
     // Preference order matters: Tctl/Tdie is the number enthusiasts quote,
     // "CPU Package" is the Intel equivalent, then any CPU-ish temperature.
@@ -118,10 +118,34 @@ function extract(sensors) {
     (s) => s.type === 'Voltage' && isCpuNode(s),
   ]);
 
+  // Fan choice, best effort in descending order of confidence:
+  //   1. an exact name the user pinned in config (or its SensorId)
+  //   2. a header the board actually calls "CPU"
+  //   3. the first header reporting a non-zero speed
+  // Step 3 is a genuine guess: plenty of boards label every header
+  // "Fan #1".."Fan #7" with nothing to say which one cools the CPU, so the
+  // fastest-spinning case fan can win. `npm run doctor` lists them all so the
+  // user can pin the right one.
   const cpuFan = pickFirst(sensors, [
+    ...(fanSensor
+      ? [
+          (s) =>
+            s.type === 'Fan' &&
+            (s.text.toLowerCase() === String(fanSensor).toLowerCase() ||
+              s.id.toLowerCase() === String(fanSensor).toLowerCase()),
+        ]
+      : []),
     (s) => s.type === 'Fan' && /cpu/i.test(s.text),
     (s) => s.type === 'Fan' && s.value > 0,
   ]);
+
+  // Flagged so the UI can mark an auto-picked fan as unverified rather than
+  // presenting a guess as fact.
+  const fanPinned =
+    Boolean(fanSensor) && cpuFan
+      ? cpuFan.text.toLowerCase() === String(fanSensor).toLowerCase() ||
+        cpuFan.id.toLowerCase() === String(fanSensor).toLowerCase()
+      : false;
 
   const mobo = pickFirst(sensors, [
     (s) => s.type === 'Temperature' && /motherboard|system|systin/i.test(s.text),
@@ -136,16 +160,28 @@ function extract(sensors) {
     cpuVolts: cpuVolts?.value ?? null,
     cpuFanRpm: cpuFan?.value ?? null,
     cpuFanLabel: cpuFan?.text ?? null,
+    cpuFanPinned: fanPinned,
+    // Every fan the board exposes, so `npm run probe` can list them and the
+    // user has something concrete to pin.
+    fans: sensors
+      .filter((s) => s.type === 'Fan')
+      .map((s) => ({ name: s.text, rpm: s.value, id: s.id })),
     moboTempC: mobo?.value ?? null,
     sensorCount: sensors.length,
   };
 }
 
 class LhmSource {
-  constructor({ enabled = true, url = 'http://127.0.0.1:8085/data.json', timeoutMs = 1500 } = {}) {
+  constructor({
+    enabled = true,
+    url = 'http://127.0.0.1:8085/data.json',
+    timeoutMs = 1500,
+    fanSensor = null,
+  } = {}) {
     this.enabled = enabled;
     this.url = url;
     this.timeoutMs = timeoutMs;
+    this.fanSensor = fanSensor;
     this.latest = null;
     this.available = false;
     this.reason = 'not polled yet';
@@ -162,7 +198,7 @@ class LhmSource {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const sensors = flatten(await res.json());
       if (!sensors.length) throw new Error('no sensors in response');
-      this.latest = extract(sensors);
+      this.latest = extract(sensors, { fanSensor: this.fanSensor });
       this.available = true;
       this.reason = null;
     } catch (err) {

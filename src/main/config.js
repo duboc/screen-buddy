@@ -14,6 +14,8 @@ const EXAMPLE_CONFIG = path.join(ROOT, 'config.example.json');
  */
 const DEFAULTS = {
   display: {
+    // 'smallest' needs no configuration and is right on almost every setup:
+    // the little sensor panel is the lowest-resolution display attached.
     strategy: 'smallest',
     bounds: { x: 0, y: 0 },
     index: 0,
@@ -39,6 +41,9 @@ const DEFAULTS = {
       enabled: true,
       url: 'http://127.0.0.1:8085/data.json',
       timeoutMs: 1500,
+      // null = auto-pick, which is only a guess on boards that label headers
+      // generically ("Fan #1".."Fan #7"). Pin an exact sensor name to be sure.
+      fanSensor: null,
     },
     network: { interface: null },
     nowPlaying: { enabled: true, intervalMs: 2000 },

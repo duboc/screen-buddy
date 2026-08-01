@@ -32,7 +32,7 @@ async function main() {
 
   console.log('\nSOURCES');
   for (const [name, state] of Object.entries(s.sources)) {
-    line(name, state.ok ? 'ok' : `unavailable — ${state.reason}`);
+    line(name, state.ok ? 'ok' : `unavailable - ${state.reason}`);
   }
 
   console.log('\nCPU');
@@ -42,7 +42,12 @@ async function main() {
   line('clock', `${show(s.cpu.clockMHz, 0)} MHz`);
   line('temp', `${show(s.cpu.tempC)} C  ${s.cpu.tempLabel ?? ''}`);
   line('power', `${show(s.cpu.powerW)} W`);
-  line('fan', `${show(s.cpu.fanRpm, 0)} RPM`);
+  line(
+    'fan',
+    `${show(s.cpu.fanRpm, 0)} RPM  ${s.cpu.fanLabel ?? ''}${
+      s.cpu.fanLabel && !s.cpu.fanPinned ? '  (auto-picked - see below)' : ''
+    }`,
+  );
 
   console.log('\nGPU');
   line('model', s.gpu.name ?? DASH);
@@ -68,6 +73,25 @@ async function main() {
   console.log('\nDISKS');
   for (const d of s.disks) {
     line(d.mount, `${show(d.pct)} % of ${show(d.sizeBytes / g, 0)} GB`);
+  }
+
+  if (s.cpu.fans.length) {
+    console.log('\nFAN HEADERS');
+    for (const f of s.cpu.fans) {
+      const mark = f.name === s.cpu.fanLabel ? ' <- shown on the HUD' : '';
+      line(f.name, `${show(f.rpm, 0)} RPM${mark}`);
+    }
+    if (!s.cpu.fanPinned) {
+      console.log(
+        '\n  The CPU fan was auto-picked (first header with a non-zero speed).',
+      );
+      console.log(
+        '  Many boards label every header generically, so this can be a case fan.',
+      );
+      console.log(
+        '  Pin the right one with sensors.libreHardwareMonitor.fanSensor in config.json.',
+      );
+    }
   }
 
   if (!s.sources.lhm.ok) {

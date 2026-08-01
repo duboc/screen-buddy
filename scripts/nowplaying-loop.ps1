@@ -1,7 +1,7 @@
 <#
   Streams the Windows "now playing" media session as one JSON line per poll.
 
-  Uses GlobalSystemMediaTransportControlsSessionManager — the same OS-level
+  Uses GlobalSystemMediaTransportControlsSessionManager - the same OS-level
   session that drives the volume-flyout media controls. That means it works for
   Spotify, any browser tab, VLC, Groove, whatever is playing, with no API key,
   no OAuth and no per-app integration.
@@ -10,7 +10,7 @@
   the built-in WinRT type projection this relies on.
 
   Spawned once and left running by src/main/sensors/nowplaying.js, which reads
-  stdout line by line — the same trick used for nvidia-smi, so no process spawn
+  stdout line by line - the same trick used for nvidia-smi, so no process spawn
   cost per poll.
 #>
 
@@ -40,7 +40,7 @@ function Await($op, $type) {
 $mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
 
 # No album art. The thumbnail is reachable as a RandomAccessStreamReference,
-# but Windows PowerShell 5.1 cannot marshal the stream OpenReadAsync returns —
+# but Windows PowerShell 5.1 cannot marshal the stream OpenReadAsync returns -
 # it arrives as an unprojected System.__ComObject that will not bind to
 # IInputStream, so DataReader cannot consume it. Getting art would mean a
 # compiled WinRT helper; the HUD shows a machine-themed placeholder instead.

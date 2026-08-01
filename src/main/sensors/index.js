@@ -85,6 +85,9 @@ class SensorHub extends EventEmitter {
         powerW: l.cpuPowerW ?? null,
         volts: l.cpuVolts ?? null,
         fanRpm: l.cpuFanRpm ?? null,
+        fanLabel: l.cpuFanLabel ?? null,
+        fanPinned: l.cpuFanPinned ?? false,
+        fans: l.fans ?? [],
       },
 
       gpu: {

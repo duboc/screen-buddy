@@ -5,7 +5,7 @@
 .DESCRIPTION
   The shortcut points at wscript.exe running restart-hidden.vbs, not at
   powershell.exe directly, so double-clicking it does not flash a console
-  window — which would rather defeat the point of a HUD you are looking at.
+  window - which would rather defeat the point of a HUD you are looking at.
 
   Uses [Environment]::GetFolderPath('Desktop') rather than "$env:USERPROFILE\
   Desktop" so it still lands in the right place when the Desktop is redirected

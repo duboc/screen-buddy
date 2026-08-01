@@ -1,16 +1,16 @@
 {
-  "$comment": "Copy to config.json and edit. config.json is gitignored, so your local tweaks stay yours. Anything you omit falls back to these defaults.",
+  "$comment": "TEMPLATE — safe defaults for any machine. Run `npm run setup` (or scripts/install.ps1) to generate a config.json tailored to your displays, or copy this file to config.json and edit by hand. config.json is gitignored, so your local settings stay yours. Anything you omit falls back to these values.",
 
   "display": {
-    "$comment": "How to pick which monitor the HUD lands on. strategy: 'bounds' matches the monitor whose top-left corner is at bounds.x/bounds.y; 'smallest' picks the lowest-resolution monitor; 'index' uses the Nth monitor as Electron enumerates them; 'primary' uses the main one. If the chosen strategy finds nothing, 'fallback' is tried.",
-    "strategy": "bounds",
-    "bounds": { "x": 2560, "y": 444 },
+    "$comment": "Which monitor the HUD takes over. strategy: 'smallest' picks the lowest-resolution display, which is almost always the little sensor panel — it needs no configuration and is the default for that reason. 'bounds' pins a specific monitor by the position of its top-left corner (run `npm run displays` to get yours); prefer it if you have two displays of the same size. 'index' uses the Nth display as Electron enumerates them — avoid it, the order is not stable across reboots and hot-plugs. 'primary' and 'largest' also exist. If the chosen strategy matches nothing, 'fallback' is used.",
+    "strategy": "smallest",
+    "bounds": { "x": 0, "y": 0 },
     "index": 0,
-    "fallback": "smallest"
+    "fallback": "primary"
   },
 
   "window": {
-    "$comment": "clickThrough makes the HUD ignore the mouse entirely — clicks pass through to whatever is underneath, so you can never accidentally focus or drag it. Turn it off if you want the interactive panel-cycling clicks.",
+    "$comment": "clickThrough makes the HUD ignore the mouse entirely — clicks pass through to whatever is underneath, so you can never accidentally focus or drag it. Turn it off if you want to interact with the panel. Use the tray icon to quit or toggle this at runtime.",
     "frame": false,
     "alwaysOnTop": true,
     "alwaysOnTopLevel": "screen-saver",
@@ -22,25 +22,27 @@
   },
 
   "polling": {
-    "$comment": "fastMs drives load/temp/clock/network. slowMs drives things that barely change (disk capacity, uptime, process count).",
+    "$comment": "fastMs drives load, temperature, clocks and network. slowMs drives things that barely change (disk capacity, uptime). 1000 is a good default; 500 is smoother and costs more CPU.",
     "fastMs": 1000,
     "slowMs": 5000
   },
 
   "sensors": {
     "nvidiaSmi": {
-      "$comment": "NVIDIA GPU telemetry. Works without admin. Set path if nvidia-smi.exe is not on PATH.",
+      "$comment": "NVIDIA GPU telemetry. Needs no elevation and no extra install — nvidia-smi ships with the driver. On AMD or Intel graphics leave this enabled but expect the GPU panel to read '--'; LibreHardwareMonitor below covers those GPUs for temperature and load.",
       "enabled": true,
       "path": "nvidia-smi"
     },
     "libreHardwareMonitor": {
-      "$comment": "OPTIONAL. Unlocks AMD CPU package temp, CPU power draw, fan RPM and motherboard sensors, which Windows will not report on its own. Install LibreHardwareMonitor, enable Options > Remote Web Server > Run, and run it as Administrator. The HUD works fine without it — those fields just read '--'.",
+      "$comment": "OPTIONAL but strongly recommended. The only way to get CPU package temperature, CPU power draw and fan RPM: Windows exposes no public API for them. Install it, then enable Options > Remote Web Server > Run (scripts/install.ps1 configures this for you) and run it as Administrator. The HUD works fine without it — those fields just read '--'.",
       "enabled": true,
       "url": "http://127.0.0.1:8085/data.json",
-      "timeoutMs": 1500
+      "timeoutMs": 1500,
+      "$fanSensor": "Which fan header to show. null auto-picks the first fan reporting a non-zero speed, which is a guess — many motherboards label headers generically as 'Fan #1'..'Fan #7' with no indication which one is the CPU cooler. Run `npm run doctor` to list yours, then pin it by exact name, e.g. \"Fan #2\".",
+      "fanSensor": null
     },
     "network": {
-      "$comment": "Read via Get-NetAdapterStatistics, not systeminformation, which silently reports zero for adapters whose name contains a space. Leave interface null to auto-pick the busiest adapter that reports Up; set it to an exact adapter name (as shown by Get-NetAdapter) to pin one.",
+      "$comment": "Read via Get-NetAdapterStatistics rather than systeminformation, which silently reports zero for any adapter whose name contains a space (e.g. 'Wi-Fi 6'). Leave interface null to auto-pick the busiest adapter reporting Up; set an exact adapter name from `Get-NetAdapter` to pin one.",
       "interface": null
     },
     "nowPlaying": {
@@ -50,10 +52,11 @@
     }
   },
 
-  "$theme": "espresso (warm brushed steel, cream gauge dials) or neon (cyan/magenta cyberpunk)",
+  "$theme": "espresso (warm brushed steel, cream manometer dials) or neon (cyan/magenta cyberpunk)",
   "theme": "espresso",
 
   "ui": {
+    "$comment": "panels can hide whole sections; the rest expands to fill the space.",
     "showSeconds": true,
     "clock24h": true,
     "scanlines": false,
@@ -70,7 +73,7 @@
   },
 
   "thresholds": {
-    "$comment": "Drives the colour shift from cyan through amber to magenta. Celsius, percent, watts.",
+    "$comment": "Where the dial's printed danger zone begins, and where the ready lamp changes state. Celsius for temperatures, percent for the rest.",
     "cpuTemp": { "warn": 75, "crit": 90 },
     "gpuTemp": { "warn": 72, "crit": 85 },
     "load": { "warn": 70, "crit": 90 },

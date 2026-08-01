@@ -36,7 +36,7 @@ app.whenReady().then(() => {
   const smallest = rows.reduce((a, b) => (b.pixels < a.pixels ? b : a));
   console.log('\nSmallest display (likely your HUD panel):');
   console.log(
-    `  index ${smallest.index} — ${smallest.bounds.width}x${smallest.bounds.height} @ ${smallest.bounds.x},${smallest.bounds.y}`,
+    `  index ${smallest.index} - ${smallest.bounds.width}x${smallest.bounds.height} @ ${smallest.bounds.x},${smallest.bounds.y}`,
   );
   console.log('\nMatching config.json snippet:');
   console.log(

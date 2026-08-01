@@ -61,7 +61,7 @@ function Test-Admin {
 
 function Find-Lhm {
     # winget ships LibreHardwareMonitor as a PORTABLE package, so it does not
-    # land in Program Files at all — it goes under the WinGet package store.
+    # land in Program Files at all - it goes under the WinGet package store.
     # Checking only the conventional install directories reports "not
     # installed" for a perfectly good install.
     $fixed = @(
@@ -81,7 +81,7 @@ function Find-Lhm {
     return $null
 }
 
-# ── report ───────────────────────────────────────────────────────────────
+# -- report ---------------------------------------------------------------
 
 Write-Step 'Current state'
 
@@ -119,7 +119,7 @@ if (-not ($HideTaskbar -or $AutoStart -or $InstallLhm -or $LhmAutoStart -or $Und
     return
 }
 
-# ── undo ─────────────────────────────────────────────────────────────────
+# -- undo -----------------------------------------------------------------
 
 if ($Undo) {
     Write-Step 'Reverting'
@@ -141,7 +141,7 @@ if ($Undo) {
     return
 }
 
-# ── taskbar ──────────────────────────────────────────────────────────────
+# -- taskbar --------------------------------------------------------------
 
 if ($HideTaskbar) {
     Write-Step 'Hiding the taskbar on secondary displays'
@@ -157,7 +157,7 @@ if ($HideTaskbar) {
     }
 }
 
-# ── autostart ────────────────────────────────────────────────────────────
+# -- autostart ------------------------------------------------------------
 
 if ($AutoStart) {
     Write-Step 'Configuring autostart at login'
@@ -179,7 +179,7 @@ if ($AutoStart) {
     }
 }
 
-# ── LibreHardwareMonitor ─────────────────────────────────────────────────
+# -- LibreHardwareMonitor -------------------------------------------------
 
 if ($InstallLhm) {
     if ($lhmInstalled) {

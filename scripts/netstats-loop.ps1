@@ -11,7 +11,7 @@
   It reports cumulative byte totals; the Node side turns those into rates.
 
   Spawned once and left running by src/main/sensors/netstats.js, which reads
-  stdout line by line — same approach as nvidia-smi and the media helper, so
+  stdout line by line - same approach as nvidia-smi and the media helper, so
   there is no process-spawn cost per tick.
 #>
 
