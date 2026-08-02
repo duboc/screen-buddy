@@ -56,6 +56,59 @@ const CODES = new Map([
 const describe = (code) =>
   CODES.get(code) ?? { icon: 'unknown', label: 'Unknown' };
 
+/**
+ * The next twelve hours, starting from the current one.
+ *
+ * Open-Meteo returns the whole local day from midnight, so the first half of
+ * the array is usually already in the past. Finding the current hour by
+ * timestamp rather than assuming an offset also keeps this correct across a DST
+ * boundary, where the day is 23 or 25 entries long.
+ */
+function buildHourly(json, hours = 12) {
+  const h = json.hourly;
+  if (!h || !Array.isArray(h.time)) return [];
+
+  const now = Date.now();
+  // The API returns local wall-clock stamps without a zone when timezone=auto,
+  // and its utc_offset_seconds says what that local time means.
+  const offsetMs = (Number(json.utc_offset_seconds) || 0) * 1000;
+  const at = (t) => Date.parse(`${t}Z`) - offsetMs;
+
+  let start = h.time.findIndex((t) => at(t) + 3600_000 > now);
+  if (start < 0) start = 0;
+
+  return h.time.slice(start, start + hours).map((t, i) => {
+    const idx = start + i;
+    const code = Number(h.weather_code?.[idx]);
+    const { icon } = describe(code);
+    const hourOfDay = Number(t.slice(11, 13));
+    // Same reason the current icon has a night variant: a sun glyph on the 3am
+    // column reads as a bug rather than as weather.
+    const night = hourOfDay < 6 || hourOfDay >= 19;
+    return {
+      at: at(t),
+      hour: hourOfDay,
+      tempC: num(h.temperature_2m?.[idx]),
+      pop: num(h.precipitation_probability?.[idx]),
+      code,
+      icon:
+        night && (icon === 'clear' || icon === 'mostly-clear') ? `${icon}-night` : icon,
+    };
+  });
+}
+
+/** Today plus the following days, as the daily block reports them. */
+function buildDays(daily) {
+  if (!daily || !Array.isArray(daily.time)) return [];
+  return daily.time.map((t, i) => ({
+    at: Date.parse(`${t}T12:00:00Z`),
+    highC: num(daily.temperature_2m_max?.[i]),
+    lowC: num(daily.temperature_2m_min?.[i]),
+    pop: num(daily.precipitation_probability_max?.[i]),
+    icon: describe(Number(daily.weather_code?.[i])).icon,
+  }));
+}
+
 class WeatherSource {
   constructor({
     enabled = true,
@@ -111,9 +164,19 @@ class WeatherSource {
         'weather_code',
         'wind_speed_10m',
       ].join(','),
-      daily: ['temperature_2m_max', 'temperature_2m_min'].join(','),
+      // The hourly and multi-day blocks cost nothing extra: the model has
+      // already computed them and one request returns the lot. Only the
+      // current reading fits in the bar, so the rest feeds a forecast panel
+      // that only exists because rotation made room for it.
+      hourly: ['temperature_2m', 'precipitation_probability', 'weather_code'].join(','),
+      daily: [
+        'temperature_2m_max',
+        'temperature_2m_min',
+        'weather_code',
+        'precipitation_probability_max',
+      ].join(','),
       timezone: 'auto',
-      forecast_days: '1',
+      forecast_days: '5',
     });
     if (this.units === 'imperial') {
       params.set('temperature_unit', 'fahrenheit');
@@ -154,6 +217,8 @@ class WeatherSource {
         isDay: cur.is_day !== 0,
         highC: daily ? num(daily.temperature_2m_max?.[0]) : null,
         lowC: daily ? num(daily.temperature_2m_min?.[0]) : null,
+        hourly: buildHourly(json),
+        days: buildDays(daily),
         unit: this.units === 'imperial' ? 'F' : 'C',
         fetchedAt: Date.now(),
       };

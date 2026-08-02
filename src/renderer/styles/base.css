@@ -4,8 +4,14 @@
 
    Sizing note: this panel is read from across a desk, not from a laptop's
    viewing distance, so type runs considerably larger than a screen UI would.
-   The row heights below are the constraint everything else is fitted into —
-   change one and check the whole column still fits. */
+   How large is a property of the desk, not of the design, so every size below
+   is in rem and the root font size is driven by --ui-scale. Type, dial
+   diameter and row heights all move together — raise the scale and the layout
+   stays in proportion instead of type outgrowing its plate. */
+
+:root {
+  --ui-scale: 1;
+}
 
 *,
 *::before,
@@ -13,6 +19,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+html {
+  /* The one place the scale is applied. Everything else is rem. */
+  font-size: calc(16px * var(--ui-scale, 1));
 }
 
 html,
@@ -28,24 +39,36 @@ body {
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.15;
   -webkit-font-smoothing: antialiased;
+
+  /* Defaults for the knobs the settings editor writes as inline properties.
+     Declared here rather than in a theme so a theme never has to know they
+     exist, and so clearing an override lands somewhere sensible. */
+  --font-num: var(--font-ui);
+  --num-weight: 300;
+  --label-tracking: 0.14em;
 }
 
 .hud {
   position: relative;
   display: grid;
-  /* Only the middle row flexes, so the panel always totals exactly the
-     display height rather than overflowing or leaving a gap. */
-  grid-template-rows: 52px 268px 1fr 46px 30px;
+  /* The bar is fixed; the deck takes the rest and divides it up itself. */
+  grid-template-rows: 3.25rem 1fr;
   height: 100%;
   padding: 6px 12px;
   gap: 5px;
 }
 
 /* Readings redraw every second; tabular figures stop the digits shifting
-   sideways on each tick, which is unreadable at a glance. */
+   sideways on each tick, which is unreadable at a glance. Off is available
+   because a few faces have no tabular set and fake it badly. */
+body[data-tabular='on'] :is(.bigval__num, .subval__num, .bar__time, .bar__secs, .bar__uptime, .flow__num, .tank__pct, .tank__abs, .media__time, .wx__temp, .wx__range, .drive, .flow__ping, .plate__foot b) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Every live readout, so one font choice covers all of them at once. */
 .bigval__num,
 .subval__num,
 .bar__time,
@@ -55,16 +78,122 @@ body {
 .tank__pct,
 .tank__abs,
 .media__time,
+.wx__temp,
 .plate__foot b {
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-num);
 }
 
 .micro {
-  font-size: 12px;
-  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
   color: var(--ink-muted);
   font-weight: 600;
+}
+
+/* ── the deck ────────────────────────────────────────────────────
+   Pages are stacked in the same box and crossfaded, so nothing reflows on a
+   page change — a layout that recalculated on every rotation would make the
+   whole panel twitch. Only the active page is visible AND hit-testable;
+   visibility:hidden also keeps the inactive ones out of the accessibility
+   tree rather than merely transparent. */
+
+.deck {
+  position: relative;
+  min-height: 0;
+}
+
+.page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--deck-fade, 600ms) linear,
+    transform var(--deck-fade, 600ms) cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s linear var(--deck-fade, 600ms);
+}
+
+.page.is-active {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+/* Slide is offered but not the default: direction is what makes motion hard to
+   ignore in peripheral vision, and this panel is almost always in the corner
+   of someone's eye rather than in front of it. */
+.deck[data-transition='slide'] .page {
+  transform: translateX(6%);
+}
+.deck[data-transition='slide'] .page.is-before {
+  transform: translateX(-6%);
+}
+.deck[data-transition='slide'] .page.is-active {
+  transform: none;
+}
+
+.deck[data-transition='none'] .page,
+.deck--instant .page {
+  transition: none;
+}
+
+.page__row {
+  display: grid;
+  gap: 5px;
+  min-height: 0;
+}
+
+.page__row > * {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The two dials travel together as one unit, so a page asks for "gauges"
+   rather than having to know there are two of them. */
+.unit--gauges {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ── page indicator ──────────────────────────────────────────────
+   Small, and in the bar rather than over the content. Without it a deck being
+   held on one page by an alert is indistinguishable from a frozen panel. */
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+}
+
+.dots[hidden] {
+  display: none;
+}
+
+.dots__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  transition: background 300ms linear;
+}
+
+.dots__dot.is-active {
+  background: var(--brass);
+}
+
+/* Held by an alert: the dot squares off, so "parked" reads differently from
+   "between turns" without needing a second colour. */
+.dots.is-held .dots__dot.is-active {
+  border-radius: 1px;
+  background: var(--mark-crit);
 }
 
 /* ── the machine plate: the shared panel material ────────────── */
@@ -102,15 +231,15 @@ body {
 }
 
 .plate__title {
-  font-size: 13px;
-  letter-spacing: 0.18em;
+  font-size: 0.8125rem;
+  letter-spacing: calc(var(--label-tracking) + 0.04em);
   font-weight: 700;
   color: var(--ink-title);
   white-space: nowrap;
 }
 
 .plate__sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--ink-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -137,14 +266,19 @@ body {
 }
 
 .plate__foot b {
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── machine bar ─────────────────────────────────────────────── */
 
+/* When the bar runs out of room the clock and the ready lamp are the last
+   things to give — they are what the bar exists for. The hostname truncates
+   and the weather compresses first. */
 .bar {
   display: flex;
   align-items: center;
@@ -152,6 +286,7 @@ body {
   gap: 16px;
   padding: 0 4px;
   border-bottom: 1px solid var(--rule);
+  overflow: hidden;
 }
 
 .bar__brand {
@@ -159,11 +294,12 @@ body {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 0 1 auto;
 }
 
 .bar__cup {
-  width: 30px;
-  height: 30px;
+  width: 1.875rem;
+  height: 1.875rem;
   flex: none;
 }
 
@@ -190,12 +326,15 @@ body {
 }
 
 .bar__name {
-  font-size: 26px;
+  font-size: 1.625rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: calc(var(--label-tracking) - 0.02em);
   text-transform: uppercase;
   color: var(--ink-title);
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── weather, in the bar's centre gap ────────────────────────── */
@@ -207,6 +346,8 @@ body {
   min-width: 0;
   margin: 0 auto;
   padding: 0 12px;
+  flex: 0 1 auto;
+  overflow: hidden;
 }
 
 .wx[hidden] {
@@ -214,8 +355,8 @@ body {
 }
 
 .wx__icon {
-  width: 30px;
-  height: 30px;
+  width: 1.875rem;
+  height: 1.875rem;
   flex: none;
   overflow: visible;
 }
@@ -259,15 +400,14 @@ body {
 }
 
 .wx__temp {
-  font-size: 30px;
+  font-size: 1.875rem;
   font-weight: 400;
   color: var(--ink);
   line-height: 1;
-  font-variant-numeric: tabular-nums;
 }
 
 .wx__deg {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--ink-muted);
 }
 
@@ -279,20 +419,19 @@ body {
 }
 
 .wx__label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--ink-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 130px;
+  max-width: 8.125rem;
 }
 
 .wx__range {
   display: flex;
   align-items: baseline;
   gap: 4px;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
 }
 
 .wx__hi {
@@ -325,8 +464,8 @@ body {
 }
 
 .lamp__bulb {
-  width: 10px;
-  height: 10px;
+  width: 0.625rem;
+  height: 0.625rem;
   border-radius: 50%;
   background: var(--status-mark);
   box-shadow: 0 0 9px var(--status-halo);
@@ -334,8 +473,8 @@ body {
 }
 
 .lamp__text {
-  font-size: 12px;
-  letter-spacing: 0.17em;
+  font-size: 0.75rem;
+  letter-spacing: calc(var(--label-tracking) + 0.03em);
   font-weight: 700;
   color: var(--status-mark);
 }
@@ -348,7 +487,7 @@ body {
 }
 
 .bar__uptime {
-  font-size: 19px;
+  font-size: 1.1875rem;
   color: var(--ink-dim);
 }
 
@@ -369,36 +508,34 @@ body {
 }
 
 .bar__date {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--ink-dim);
   white-space: nowrap;
   letter-spacing: 0.04em;
 }
 
 .bar__time {
-  font-size: 46px;
-  font-weight: 300;
+  font-size: 2.875rem;
+  font-weight: var(--num-weight);
   color: var(--ink);
   line-height: 1;
 }
 
 .bar__secs {
-  font-size: 21px;
+  font-size: 1.3125rem;
   color: var(--brass);
 }
 
-/* ── gauges row ──────────────────────────────────────────────── */
+/* ── gauges ──────────────────────────────────────────────────── */
 
-.row-gauges {
-  display: grid;
-  grid-template-columns: 1fr 1fr 0.78fr;
-  gap: 5px;
-  min-height: 0;
-}
-
+/* minmax(0, …) rather than a bare track size throughout: a grid track defaults
+   to a min-content floor, so an over-long GPU name or an oversized numeral used
+   to push its neighbours off the panel instead of being clipped inside its own
+   plate. Everything here is inside `overflow: hidden`, so compressing is always
+   the better failure. */
 .gauge__body {
   display: grid;
-  grid-template-columns: 152px 1fr;
+  grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   flex: 1;
@@ -406,8 +543,8 @@ body {
 }
 
 .dial {
-  width: 152px;
-  height: 152px;
+  width: 9.5rem;
+  height: 9.5rem;
   position: relative;
 }
 
@@ -485,18 +622,19 @@ body {
   display: flex;
   align-items: baseline;
   gap: 4px;
+  min-width: 0;
 }
 
 .bigval__num {
-  font-size: 88px;
-  font-weight: 300;
+  font-size: 5.5rem;
+  font-weight: var(--num-weight);
   line-height: 0.9;
   color: var(--status-read);
   letter-spacing: -0.03em;
 }
 
 .bigval__unit {
-  font-size: 23px;
+  font-size: 1.4375rem;
   color: var(--ink-muted);
 }
 
@@ -504,10 +642,11 @@ body {
   display: flex;
   align-items: baseline;
   gap: 7px;
+  min-width: 0;
 }
 
 .subval__num {
-  font-size: 46px;
+  font-size: 2.875rem;
   font-weight: 400;
   color: var(--ink);
   line-height: 1;
@@ -530,6 +669,7 @@ body {
   gap: 1px;
   justify-items: center;
   min-height: 0;
+  min-width: 0;
 }
 
 /* Glass vessel: inset well, water fills from the bottom. */
@@ -588,39 +728,39 @@ body {
 }
 
 .tank__pct {
-  font-size: 42px;
+  font-size: 2.625rem;
   font-weight: 400;
   color: var(--ink);
   line-height: 1.05;
 }
 
 .tank__abs {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--ink-muted);
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ── middle row: now playing + flow ──────────────────────────── */
-
-.row-mid {
-  display: grid;
-  grid-template-columns: 1.92fr 1fr;
-  gap: 5px;
-  min-height: 0;
-}
+/* ── now playing ─────────────────────────────────────────────── */
 
 .media__body {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   flex: 1;
   min-height: 0;
+  /* Track titles are three stacked lines and the progress bar is pinned to the
+     bottom of the plate. Without this, a short row lets the text run straight
+     through the bar rather than being cut off above it. */
+  overflow: hidden;
 }
 
 .media__art {
-  width: 78px;
-  height: 78px;
+  width: 4.875rem;
+  height: 4.875rem;
   border-radius: 4px;
   background: var(--art-well);
   border: 1px solid var(--plate-edge);
@@ -629,9 +769,10 @@ body {
   flex: none;
 }
 
+/* Proportional, so the disc keeps its margin inside the well at any size. */
 .media__art svg {
-  width: 52px;
-  height: 52px;
+  width: 66%;
+  height: 66%;
 }
 
 .art__disc {
@@ -662,7 +803,7 @@ body {
 }
 
 .media__title {
-  font-size: 38px;
+  font-size: 2.375rem;
   font-weight: 500;
   color: var(--ink);
   line-height: 1.08;
@@ -672,7 +813,7 @@ body {
 }
 
 .media__artist {
-  font-size: 24px;
+  font-size: 1.5rem;
   color: var(--brass);
   white-space: nowrap;
   overflow: hidden;
@@ -680,7 +821,7 @@ body {
 }
 
 .media__album {
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--ink-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -688,8 +829,8 @@ body {
 }
 
 .media__state {
-  font-size: 12px;
-  letter-spacing: 0.15em;
+  font-size: 0.75rem;
+  letter-spacing: var(--label-tracking);
   font-weight: 700;
   color: var(--brass);
   flex: none;
@@ -705,7 +846,7 @@ body {
 }
 
 .media__time {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--ink-muted);
 }
 
@@ -742,20 +883,20 @@ body {
 }
 
 .flow__arrow {
-  font-size: 23px;
+  font-size: 1.4375rem;
   color: var(--brass);
   flex: none;
 }
 
 .flow__num {
-  font-size: 42px;
+  font-size: 2.625rem;
   font-weight: 400;
   color: var(--ink);
   line-height: 1;
 }
 
 .flow__unit {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--ink-muted);
   white-space: nowrap;
 }
@@ -789,13 +930,9 @@ body {
   display: flex;
   align-items: baseline;
   gap: 7px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--ink-muted);
   flex: none;
-}
-
-.flow__window {
-  margin-left: auto;
 }
 
 /* Latency takes the status ramp, but always beside its own numeral and the
@@ -806,7 +943,6 @@ body {
   align-items: baseline;
   gap: 5px;
   color: var(--status-read);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ── thread strip ────────────────────────────────────────────── */
@@ -817,6 +953,9 @@ body {
   align-items: center;
   gap: 14px;
   padding: 5px 11px;
+  /* Explicit, because the strip sits on an auto-height row and its bar grid
+     has no intrinsic height of its own to give it. */
+  height: 2.875rem;
 }
 
 .strip__label {
@@ -859,7 +998,8 @@ body {
   gap: 14px;
   border-top: 1px solid var(--rule);
   padding: 0 4px;
-  font-size: 12px;
+  height: 1.875rem;
+  font-size: 0.75rem;
   color: var(--ink-muted);
 }
 
@@ -913,7 +1053,7 @@ body {
 }
 
 .disk__bar {
-  width: 40px;
+  width: 2.5rem;
   height: 4px;
   border-radius: 2px;
   background: var(--tank-well);
@@ -939,11 +1079,579 @@ body {
   align-items: baseline;
   gap: 4px;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 
 .drive__temp {
   color: var(--status-read);
+}
+
+/* ── room to breathe ─────────────────────────────────────────────
+   The payoff for rotating: a panel with a page to itself gets a bigger dial
+   and a bigger numeral, instead of the same small one floating in the space it
+   just gained. A gauge alone on a 1024x600 panel goes from 268px of height to
+   480 — leaving that unused would make rotation cost legibility rather than
+   buy it.
+
+   Size containment, so the queries can see height as well as width. It is safe
+   here specifically because every panel is a grid item in a row with a
+   definite height: the deck gives the height, the panel never has to derive it
+   from its own content, so there is no cycle to collapse.
+
+   Scoped to a rotating deck. The classic layout's rows have not changed, and a
+   query that fired there would push the dial straight out of one.
+
+   Two regimes, in order of specificity:
+     1. Wide and short — grow in place, dial still beside the numerals.
+     2. Tall — restack. A tall narrow box cannot use its height for a dial that
+        is sitting next to something; moving the readout underneath lets the
+        dial take nearly the full width. This is the common case, because a
+        rotating page is usually the full height of the panel. */
+
+.deck[data-rotating='true'] :is(.gauge, .media, .flow) {
+  container-type: size;
+}
+
+/* 1 — wider than the classic layout ever gets, but not tall. */
+@container (min-width: 26rem) {
+  .gauge__body {
+    --dial-size: min(clamp(9.5rem, 46cqw, 17rem), 78cqh);
+    grid-template-columns: minmax(0, var(--dial-size)) minmax(0, 1fr);
+  }
+
+  .dial {
+    width: var(--dial-size);
+    height: var(--dial-size);
+  }
+
+  .bigval__num {
+    font-size: min(clamp(5.5rem, 24cqw, 9.5rem), 30cqh);
+  }
+
+  .subval__num {
+    font-size: min(clamp(2.875rem, 12cqw, 4.5rem), 15cqh);
+  }
+}
+
+/* 2 — tall enough that side-by-side wastes the height it was given. */
+@container (min-height: 20rem) {
+  .gauge__body {
+    --dial-size: min(84cqw, 56cqh);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    justify-items: center;
+    gap: 4px;
+  }
+
+  .dial {
+    width: var(--dial-size);
+    height: var(--dial-size);
+    align-self: center;
+  }
+
+  /* The readout turns into one line under the dial: temperature and load read
+     as a pair rather than as a stack squeezed against the right edge. */
+  .gauge__read {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: center;
+    gap: 1.4rem;
+    width: 100%;
+  }
+
+  .bigval__num {
+    font-size: min(26cqw, 17cqh);
+  }
+
+  .subval__num {
+    font-size: min(14cqw, 9cqh);
+  }
+}
+
+/* Now brewing and flow, given a page of their own. */
+@container (min-height: 16rem) {
+  .flow__num {
+    font-size: min(9cqw, 16cqh);
+  }
+
+  .flow__arrow {
+    font-size: min(5cqw, 9cqh);
+  }
+
+  .flow__unit,
+  .flow__scale {
+    font-size: min(2.6cqw, 5cqh);
+  }
+
+  .media__art {
+    width: min(26cqw, 34cqh);
+    height: min(26cqw, 34cqh);
+  }
+
+  .media__title {
+    font-size: min(7cqw, 13cqh);
+  }
+
+  .media__artist {
+    font-size: min(4.4cqw, 8cqh);
+  }
+
+  .media__album {
+    font-size: min(2.8cqw, 5cqh);
+  }
+}
+
+/* ── orders: what is actually responsible ────────────────────────
+   Two independent rankings side by side, because the process eating the CPU
+   and the one eating the RAM are usually not the same process, and a single
+   merged list hides whichever one you came looking for. */
+
+.procs__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+.procs__col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.procs__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  flex: 1;
+  min-height: 0;
+  gap: 2px;
+}
+
+.proc {
+  display: grid;
+  /* The bar is the flexible middle column, so a long process name shortens the
+     bar rather than pushing the figure off the plate. */
+  grid-template-columns: minmax(0, auto) minmax(1.5rem, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.proc__name {
+  font-size: 1rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.proc__name i {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+
+.proc__bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--tank-well);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.proc__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--brass);
+  transition: width 320ms ease-out;
+}
+
+.proc__val {
+  font-family: var(--font-num);
+  font-size: 1rem;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+/* ── portafilter: disk throughput and endurance ──────────────── */
+
+/* The write trace is drawn into the same half-height box as the read trace and
+   mirrored into place, which is exact and avoids maintaining a second set of
+   coordinates that could drift out of step with the first. */
+.flow__mirror {
+  transform: translateY(52px) scaleY(-1);
+}
+
+.spark {
+  width: 100%;
+  display: block;
+}
+
+.spark--io {
+  flex: 1;
+  min-height: 0;
+}
+
+.drivelist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+  margin-top: auto;
+  border-top: 1px solid var(--rule);
+  padding-top: 5px;
+}
+
+.drivecard {
+  display: grid;
+  grid-template-columns: auto auto minmax(2rem, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.drivecard__label {
+  font-size: 0.75rem;
+  letter-spacing: var(--label-tracking);
+  font-weight: 700;
+  color: var(--ink-title);
+}
+
+.drivecard__temp {
+  font-family: var(--font-num);
+  color: var(--status-read);
+}
+
+.drivecard__bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--tank-well);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.drivecard__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ink-faint);
+}
+
+.drivecard__free {
+  font-family: var(--font-num);
+}
+
+/* Empty until endurance actually starts falling, so it never becomes a field
+   you learn to skip over. */
+.drivecard__life {
+  font-family: var(--font-num);
+  color: var(--mark-warn);
+}
+
+/* ── log book: how it got here ───────────────────────────────── */
+
+.trends__rows {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  flex: 1;
+  min-height: 0;
+  gap: 4px;
+}
+
+.trend {
+  display: grid;
+  grid-template-columns: 4.2rem minmax(2rem, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.trend__label {
+  color: var(--ink-muted);
+}
+
+.trend__plot {
+  height: 2.2rem;
+  min-width: 0;
+}
+
+.trend__line {
+  fill: none;
+  stroke: var(--status-read);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+.trend__area {
+  fill: var(--status-mark);
+  opacity: 0.24;
+  stroke: none;
+}
+
+/* Drawn only when the threshold falls inside the visible range, so it means
+   "you are approaching this" rather than decorating the top of every graph. */
+.trend__warn {
+  stroke: var(--mark-warn);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.65;
+  vector-effect: non-scaling-stroke;
+}
+
+.trend__now {
+  font-family: var(--font-num);
+  font-size: 1.4375rem;
+  color: var(--status-read);
+  min-width: 3.2rem;
+  text-align: right;
+}
+
+.trend__peak,
+.trend__over {
+  font-family: var(--font-num);
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  min-width: 3.4rem;
+  text-align: right;
+}
+
+.trend__over {
+  color: var(--mark-warn);
+}
+
+/* ── outside: the rest of the forecast ───────────────────────── */
+
+.wxfc__hours {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.fchour {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 2px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.fchour__h {
+  font-family: var(--font-num);
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.fchour__icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  overflow: visible;
+}
+
+.fchour__t {
+  font-family: var(--font-num);
+  font-size: 1.1875rem;
+  color: var(--ink);
+}
+
+.fchour__p {
+  font-family: var(--font-num);
+  font-size: 0.75rem;
+  color: var(--mark-nominal);
+  min-height: 0.9rem;
+}
+
+.wxfc__days {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 10px;
+  flex: none;
+  margin-top: auto;
+  border-top: 1px solid var(--rule);
+  padding-top: 6px;
+}
+
+.fcday {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  font-family: var(--font-num);
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.fcday .micro {
+  flex: none;
+}
+
+.fcday__hi {
+  color: var(--mark-warn);
+}
+
+.fcday__lo {
+  color: var(--mark-nominal);
+}
+
+.fcday__sep {
+  color: var(--ink-faint);
+}
+
+/* ── pressure: the board's own sensors ───────────────────────── */
+
+.press__fans {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  flex: 1;
+  min-height: 0;
+  gap: 2px;
+}
+
+.fanrow {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(2rem, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+/* A header wired to nothing reads zero and always will. Dimmed rather than
+   hidden, so the list still says the header exists. */
+.fanrow--idle {
+  opacity: 0.4;
+}
+
+.fanrow__name {
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.fanrow__bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--tank-well);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.fanrow__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--mark-nominal);
+  transition: width 320ms ease-out;
+}
+
+.fanrow__val {
+  font-family: var(--font-num);
+  font-size: 1rem;
+  color: var(--ink);
+  min-width: 2.6rem;
+  text-align: right;
+}
+
+.press__foot {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  border-top: 1px solid var(--rule);
+  padding-top: 5px;
+  margin-top: auto;
+  flex: none;
+}
+
+.press__foot div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.press__foot b {
+  font-family: var(--font-num);
+  font-size: 1.1875rem;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── room to breathe, for the new panels ─────────────────────── */
+
+.deck[data-rotating='true'] :is(.procs, .trends, .wxfc, .press, .store) {
+  container-type: size;
+}
+
+@container (min-height: 16rem) {
+  .proc__name,
+  .proc__val,
+  .fanrow__val {
+    font-size: min(3.4cqw, 6cqh);
+  }
+
+  .fanrow__name {
+    font-size: min(3cqw, 5.4cqh);
+  }
+
+  .trend__now {
+    font-size: min(5cqw, 11cqh);
+  }
+
+  .trend__plot {
+    height: min(14cqh, 3.4rem);
+  }
+
+  .fchour__t {
+    font-size: min(4.4cqw, 9cqh);
+  }
+
+  .fcday {
+    font-size: min(2.6cqw, 7cqh);
+  }
+
+  .drivecard,
+  .drivecard__free,
+  .drivecard__temp {
+    font-size: min(2.8cqw, 6cqh);
+  }
+
+  /* A 5px bar beside 34px type reads as a hairline. Grows with the panel so
+     the pairing keeps its proportions. */
+  .proc__bar,
+  .fanrow__bar,
+  .drivecard__bar {
+    height: min(1.5cqh, 0.75rem);
+  }
+
+  .fchour__icon {
+    width: min(6.5cqw, 20cqh);
+    height: min(6.5cqw, 20cqh);
+  }
 }
 
 /* ── overlays ────────────────────────────────────────────────── */
@@ -955,17 +1663,10 @@ body {
   display: var(--grain-display);
   background: var(--grain-bg);
   opacity: var(--grain-opacity);
-  mix-blend-mode: overlay;
-}
-
-/* Hidden panels collapse so the rest expands to fill. */
-.hud[data-hidden-gauges='true'] .row-gauges,
-.hud[data-hidden-media='true'] .media,
-.hud[data-hidden-network='true'] .flow,
-.hud[data-hidden-reservoir='true'] .reservoir,
-.hud[data-hidden-cores='true'] .strip,
-.hud[data-hidden-footer='true'] .foot {
-  display: none;
+  /* Overlay is right on a dark body, where it lightens the texture into the
+     surface. On a light one it does the opposite of texturing, so the light
+     theme asks for multiply instead. */
+  mix-blend-mode: var(--grain-blend, overlay);
 }
 
 /* A stale feed dims rather than blanking — no skeleton, no layout jump. */
@@ -978,7 +1679,8 @@ body {
   .dial__needle line,
   .tank__fill,
   .strip__cell i,
-  .media__fill {
+  .media__fill,
+  .page {
     transition: none;
   }
 }

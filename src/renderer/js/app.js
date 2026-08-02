@@ -1,6 +1,9 @@
 import * as f from './format.js';
 import { buildDialFace, needleAngle } from './dial.js';
 import { renderWeatherIcon } from './weather-icons.js';
+import { createDeck } from './deck.js';
+import { applyTheme } from './theme.js';
+import { linePath, areaPath, domainOf } from './sparkline.js';
 
 /* ── constants ─────────────────────────────────────────────────── */
 
@@ -19,6 +22,9 @@ const STALE_AFTER_MS = 6000;
 
 const el = {
   hud: document.getElementById('hud'),
+  deck: document.getElementById('deck'),
+  deckDots: document.getElementById('deck-dots'),
+  panelStore: document.getElementById('panel-store'),
   host: document.getElementById('host'),
   uptime: document.getElementById('uptime'),
   clock: document.getElementById('clock'),
@@ -58,6 +64,30 @@ const el = {
   mediaPos: document.getElementById('media-pos'),
   mediaEnd: document.getElementById('media-end'),
   mediaFill: document.getElementById('media-fill'),
+  procsTotal: document.getElementById('procs-total'),
+  procsCpu: document.getElementById('procs-cpu'),
+  procsMem: document.getElementById('procs-mem'),
+  storeSub: document.getElementById('store-sub'),
+  storeRead: document.getElementById('store-read'),
+  storeReadUnit: document.getElementById('store-read-unit'),
+  storeWrite: document.getElementById('store-write'),
+  storeWriteUnit: document.getElementById('store-write-unit'),
+  storeAreaR: document.getElementById('store-area-r'),
+  storeLineR: document.getElementById('store-line-r'),
+  storeAreaW: document.getElementById('store-area-w'),
+  storeLineW: document.getElementById('store-line-w'),
+  storeDrives: document.getElementById('store-drives'),
+  trendsSpan: document.getElementById('trends-span'),
+  trendsRows: document.getElementById('trends-rows'),
+  fcSub: document.getElementById('fc-sub'),
+  fcHours: document.getElementById('fc-hours'),
+  fcDays: document.getElementById('fc-days'),
+  pressSub: document.getElementById('press-sub'),
+  pressFans: document.getElementById('press-fans'),
+  pressMobo: document.getElementById('press-mobo'),
+  pressVolts: document.getElementById('press-volts'),
+  pressGpuPwr: document.getElementById('press-gpupwr'),
+  pressSwap: document.getElementById('press-swap'),
   sources: document.getElementById('sources'),
   disks: document.getElementById('disks'),
 };
@@ -78,7 +108,14 @@ let config = null;
 let netHistory = [];
 let coreCells = [];
 let lastSnapshotAt = 0;
+let lastSnapshot = null;
 const dialsBuilt = new WeakSet();
+
+const deck = createDeck({
+  deck: el.deck,
+  dots: el.deckDots,
+  store: el.panelStore,
+});
 
 /* ── gauges ────────────────────────────────────────────────────── */
 
@@ -378,6 +415,363 @@ function renderDrives(drives, thresholds) {
   el.drives.replaceChildren(frag);
 }
 
+/* ── processes ─────────────────────────────────────────────────── */
+
+/**
+ * One ranked list. Bars are scaled to the largest entry in THIS list rather
+ * than to an absolute maximum: the question being asked is "what is the biggest
+ * thing running", and against a fixed 0–100% axis five processes at 1% are five
+ * empty rows.
+ */
+function renderProcList(node, rows, format) {
+  const peak = rows.reduce((m, r) => Math.max(m, r.value ?? 0), 0) || 1;
+  const frag = document.createDocumentFragment();
+
+  for (const row of rows) {
+    const li = document.createElement('li');
+    li.className = 'proc';
+
+    const name = document.createElement('span');
+    name.className = 'proc__name';
+    name.textContent = row.name;
+    // Grouped processes say so, because "chrome 3.6 GB" invites the question
+    // and "chrome ×24" answers it.
+    if (row.instances > 1) {
+      const mult = document.createElement('i');
+      mult.textContent = `×${row.instances}`;
+      name.append(mult);
+    }
+
+    const bar = document.createElement('span');
+    bar.className = 'proc__bar';
+    const fill = document.createElement('i');
+    fill.style.width = `${Math.min(100, ((row.value ?? 0) / peak) * 100)}%`;
+    bar.append(fill);
+
+    const value = document.createElement('span');
+    value.className = 'proc__val';
+    value.textContent = format(row.value);
+
+    li.append(name, bar, value);
+    frag.append(li);
+  }
+  node.replaceChildren(frag);
+}
+
+function renderProcesses(procs) {
+  if (!procs) {
+    el.procsTotal.textContent = '';
+    el.procsCpu.replaceChildren();
+    el.procsMem.replaceChildren();
+    return;
+  }
+  el.procsTotal.textContent = `${procs.total} running`;
+
+  renderProcList(
+    el.procsCpu,
+    procs.byCpu.map((p) => ({ ...p, value: p.cpuPct })),
+    (v) => (Number.isFinite(v) ? `${v.toFixed(1)}%` : f.DASH),
+  );
+  renderProcList(
+    el.procsMem,
+    procs.byMem.map((p) => ({ ...p, value: p.memBytes })),
+    (v) => f.bytesInline(v),
+  );
+}
+
+/* ── storage ───────────────────────────────────────────────────── */
+
+let ioHistory = [];
+
+function renderStorage(storage) {
+  const read = storage.reduce((a, d) => a + (d.readBps ?? 0), 0);
+  const write = storage.reduce((a, d) => a + (d.writeBps ?? 0), 0);
+
+  ioHistory.push({ read, write });
+  const limit = config.ui.historySamples;
+  if (ioHistory.length > limit) ioHistory = ioHistory.slice(-limit);
+
+  // Same encoding as the network plot: read above the axis, write below, on one
+  // shared scale, so position carries identity and no second hue is needed.
+  const peak = f.niceCeil(
+    ioHistory.reduce((m, x) => Math.max(m, x.read, x.write), 1024 * 1024),
+  );
+  const half = { width: PLOT_W, height: PLOT_MID, min: 0, max: peak, pad: 2 };
+  const reads = ioHistory.map((x) => x.read);
+  const writes = ioHistory.map((x) => x.write);
+
+  el.storeLineR.setAttribute('d', linePath(reads, half));
+  el.storeAreaR.setAttribute('d', areaPath(reads, half));
+  // Writes are drawn into the same half-height box and flipped underneath by
+  // CSS, which is exact and avoids computing a mirrored coordinate set.
+  el.storeLineW.setAttribute('d', linePath(writes, half));
+  el.storeAreaW.setAttribute('d', areaPath(writes, half));
+
+  const r = f.bytes(read, { perSecond: true });
+  const w = f.bytes(write, { perSecond: true });
+  el.storeRead.textContent = r.value;
+  el.storeReadUnit.textContent = r.unit;
+  el.storeWrite.textContent = w.value;
+  el.storeWriteUnit.textContent = w.unit;
+  el.storeSub.textContent = storage.length
+    ? `${storage.length} drive${storage.length > 1 ? 's' : ''}`
+    : 'needs LibreHardwareMonitor';
+
+  const frag = document.createDocumentFragment();
+  for (const d of storage.slice(0, 4)) {
+    const row = document.createElement('div');
+    row.className = 'drivecard';
+    row.dataset.status = f.statusOf(d.tempC, config.thresholds.driveTemp);
+
+    const label = document.createElement('span');
+    label.className = 'drivecard__label';
+    label.textContent = d.label;
+
+    const temp = document.createElement('span');
+    temp.className = 'drivecard__temp';
+    temp.textContent = `${f.celsius(d.tempC)}°`;
+
+    const bar = document.createElement('span');
+    bar.className = 'drivecard__bar';
+    const fill = document.createElement('i');
+    fill.style.width = `${Math.min(100, Math.max(0, d.usedPct ?? 0))}%`;
+    bar.append(fill);
+
+    const free = document.createElement('span');
+    free.className = 'drivecard__free';
+    free.textContent = Number.isFinite(d.freeBytes)
+      ? `${f.bytesInline(d.freeBytes)} free`
+      : f.DASH;
+
+    // Endurance is the most actionable thing a drive reports and is invisible
+    // everywhere else on this panel. Shown only once it has started falling —
+    // a permanent "LIFE 100%" is noise that trains you to ignore the field.
+    const life = document.createElement('span');
+    life.className = 'drivecard__life';
+    life.textContent =
+      Number.isFinite(d.lifePct) && d.lifePct < 100 ? `LIFE ${f.pct(d.lifePct)}` : '';
+
+    row.append(label, temp, bar, free, life);
+    frag.append(row);
+  }
+  el.storeDrives.replaceChildren(frag);
+}
+
+/* ── trends ────────────────────────────────────────────────────── */
+
+const TREND_ROWS = [
+  { key: 'cpuTemp', label: 'BOILER', unit: '°', threshold: 'cpuTemp', floor: 10 },
+  { key: 'gpuTemp', label: 'GROUP', unit: '°', threshold: 'gpuTemp', floor: 10 },
+  { key: 'cpuLoad', label: 'LOAD', unit: '%', threshold: 'load', floor: 20 },
+  { key: 'memPct', label: 'RAM', unit: '%', threshold: 'memory', floor: 10 },
+];
+
+const SPARK_W = 300;
+const SPARK_H = 34;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function renderTrends(history, thresholds) {
+  if (!history) {
+    el.trendsRows.replaceChildren();
+    el.trendsSpan.textContent = '';
+    return;
+  }
+
+  el.trendsSpan.textContent = `last ${f.duration(history.spanSec)}`;
+  const frag = document.createDocumentFragment();
+
+  for (const spec of TREND_ROWS) {
+    const values = history.series[spec.key] ?? [];
+    const now = [...values].reverse().find((v) => Number.isFinite(v)) ?? null;
+    const t = thresholds[spec.threshold] ?? {};
+
+    const row = document.createElement('div');
+    row.className = 'trend';
+    row.dataset.status = f.statusOf(now, t);
+
+    const label = document.createElement('span');
+    label.className = 'micro trend__label';
+    label.textContent = spec.label;
+
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'spark trend__plot');
+    svg.setAttribute('viewBox', `0 0 ${SPARK_W} ${SPARK_H}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+
+    const domain = domainOf(values, { floor: spec.floor });
+    const opts = { width: SPARK_W, height: SPARK_H, ...domain, pad: 2 };
+
+    // The warn line is drawn only when it actually falls inside the visible
+    // range, so it marks a threshold being approached rather than sitting
+    // uselessly pinned to the top edge of every idle graph.
+    if (Number.isFinite(t.warn) && t.warn > domain.min && t.warn < domain.max) {
+      const usable = SPARK_H - 4;
+      const y = 2 + usable - ((t.warn - domain.min) / (domain.max - domain.min)) * usable;
+      const rule = document.createElementNS(SVG_NS, 'line');
+      rule.setAttribute('class', 'trend__warn');
+      rule.setAttribute('x1', '0');
+      rule.setAttribute('x2', String(SPARK_W));
+      rule.setAttribute('y1', y.toFixed(2));
+      rule.setAttribute('y2', y.toFixed(2));
+      svg.append(rule);
+    }
+
+    const area = document.createElementNS(SVG_NS, 'path');
+    area.setAttribute('class', 'trend__area');
+    area.setAttribute('d', areaPath(values, opts));
+    const line = document.createElementNS(SVG_NS, 'path');
+    line.setAttribute('class', 'trend__line');
+    line.setAttribute('d', linePath(values, opts));
+    svg.append(area, line);
+
+    const nowEl = document.createElement('span');
+    nowEl.className = 'trend__now';
+    nowEl.textContent = Number.isFinite(now) ? `${f.num(now, 0)}${spec.unit}` : f.DASH;
+
+    const peak = history.peaks[spec.key];
+    const peakEl = document.createElement('span');
+    peakEl.className = 'trend__peak';
+    peakEl.textContent = Number.isFinite(peak?.value)
+      ? `pk ${f.num(peak.value, 0)}${spec.unit}`
+      : '';
+
+    // Time spent over the warn line. This is what turns "it got hot once" into
+    // "it has been hot for nine minutes", which are different problems.
+    const over = history.aboveSec[spec.key];
+    const overSec = (over?.warn ?? 0) + (over?.crit ?? 0);
+    const overEl = document.createElement('span');
+    overEl.className = 'trend__over';
+    overEl.textContent = overSec > 0 ? `▲ ${f.duration(overSec)}` : '';
+
+    row.append(label, svg, nowEl, peakEl, overEl);
+    frag.append(row);
+  }
+  el.trendsRows.replaceChildren(frag);
+}
+
+/* ── forecast ──────────────────────────────────────────────────── */
+
+function renderForecast(w) {
+  if (!w || !w.hourly?.length) {
+    el.fcHours.replaceChildren();
+    el.fcDays.replaceChildren();
+    el.fcSub.textContent = 'no forecast';
+    return;
+  }
+  el.fcSub.textContent = `${w.label} now`;
+
+  const hours = document.createDocumentFragment();
+  for (const h of w.hourly) {
+    const col = document.createElement('div');
+    col.className = 'fchour';
+
+    const hour = document.createElement('span');
+    hour.className = 'fchour__h';
+    hour.textContent = String(h.hour).padStart(2, '0');
+
+    const icon = document.createElementNS(SVG_NS, 'svg');
+    icon.setAttribute('class', 'fchour__icon');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    renderWeatherIcon(icon, h.icon);
+
+    const temp = document.createElement('span');
+    temp.className = 'fchour__t';
+    temp.textContent = `${f.num(h.tempC, 0)}°`;
+
+    // Shown only once there is a real chance of rain. A row of "0%" under every
+    // hour is twelve columns of ink saying nothing.
+    const pop = document.createElement('span');
+    pop.className = 'fchour__p';
+    pop.textContent = Number.isFinite(h.pop) && h.pop >= 10 ? `${Math.round(h.pop)}%` : '';
+
+    col.append(hour, icon, temp, pop);
+    hours.append(col);
+  }
+  el.fcHours.replaceChildren(hours);
+
+  const days = document.createDocumentFragment();
+  for (const [i, d] of (w.days ?? []).entries()) {
+    const cell = document.createElement('div');
+    cell.className = 'fcday';
+
+    const name = document.createElement('span');
+    name.className = 'micro';
+    name.textContent =
+      i === 0
+        ? 'TODAY'
+        : new Date(d.at).toLocaleDateString(undefined, { weekday: 'short' });
+
+    const hi = document.createElement('span');
+    hi.className = 'fcday__hi';
+    hi.textContent = `${f.num(d.highC, 0)}°`;
+
+    const sep = document.createElement('span');
+    sep.className = 'fcday__sep';
+    sep.textContent = '/';
+
+    const lo = document.createElement('span');
+    lo.className = 'fcday__lo';
+    lo.textContent = `${f.num(d.lowC, 0)}°`;
+
+    cell.append(name, hi, sep, lo);
+    days.append(cell);
+  }
+  el.fcDays.replaceChildren(days);
+}
+
+/* ── pressure ──────────────────────────────────────────────────── */
+
+function renderPressure(s) {
+  const fans = (s.cpu.fans ?? []).filter((fan) => Number.isFinite(fan.rpm));
+  el.pressSub.textContent = fans.length ? `${fans.length} headers` : 'needs LibreHardwareMonitor';
+
+  // Scaled to the fastest header rather than an assumed ceiling: case fans and
+  // a pump top out at very different speeds.
+  const peak = Math.max(1200, ...fans.map((fan) => fan.rpm));
+  const frag = document.createDocumentFragment();
+
+  for (const fan of fans.slice(0, 10)) {
+    const row = document.createElement('div');
+    // A header wired to nothing reads 0 and always will. Dimming it keeps the
+    // list honest without pretending the header is not there.
+    row.className = fan.rpm > 0 ? 'fanrow' : 'fanrow fanrow--idle';
+
+    const name = document.createElement('span');
+    name.className = 'fanrow__name';
+    name.textContent = fan.name;
+
+    const bar = document.createElement('span');
+    bar.className = 'fanrow__bar';
+    const fill = document.createElement('i');
+    fill.style.width = `${Math.min(100, (fan.rpm / peak) * 100)}%`;
+    bar.append(fill);
+
+    const value = document.createElement('span');
+    value.className = 'fanrow__val';
+    value.textContent = fan.rpm > 0 ? String(Math.round(fan.rpm)) : '—';
+
+    row.append(name, bar, value);
+    frag.append(row);
+  }
+  el.pressFans.replaceChildren(frag);
+
+  el.pressMobo.textContent = Number.isFinite(s.sys.moboTempC)
+    ? `${f.celsius(s.sys.moboTempC)}°`
+    : f.DASH;
+  el.pressVolts.textContent = Number.isFinite(s.cpu.volts)
+    ? `${s.cpu.volts.toFixed(3)} V`
+    : f.DASH;
+  // Against the limit, because 210 W means nothing without knowing whether the
+  // card is allowed 220 or 450.
+  el.pressGpuPwr.textContent =
+    Number.isFinite(s.gpu.powerW) && Number.isFinite(s.gpu.powerLimitW)
+      ? `${Math.round(s.gpu.powerW)}/${Math.round(s.gpu.powerLimitW)} W`
+      : f.watts(s.gpu.powerW);
+  el.pressSwap.textContent = Number.isFinite(s.mem.swapUsedBytes)
+    ? f.memPair(s.mem.swapUsedBytes, s.mem.swapTotalBytes)
+    : f.DASH;
+}
+
 /* ── ready lamp ────────────────────────────────────────────────── */
 
 const LAMP_WORDS = { nominal: 'READY', warn: 'HEATING', crit: 'OVER TEMP' };
@@ -395,6 +789,7 @@ function renderLamp(snapshot, thresholds) {
       : 'nominal';
   el.lamp.dataset.status = worst;
   el.lampText.textContent = LAMP_WORDS[worst];
+  return worst;
 }
 
 /* ── clock ─────────────────────────────────────────────────────── */
@@ -436,7 +831,16 @@ function render(s) {
   el.host.textContent = s.sys.host ?? '—';
   el.uptime.textContent = f.duration(s.sys.uptimeSec);
 
-  renderLamp(s, t);
+  // The lamp's verdict is also what decides whether the deck parks itself on
+  // the gauges: an alarm should never be sitting on a page nobody is looking at.
+  deck.setAlert(renderLamp(s, t));
+  deck.setAvailability({
+    media: Boolean(s.media?.title),
+    // "Busy" rather than "connected" — a page that appears for background
+    // chatter would be on screen permanently and stop meaning anything.
+    network: (s.net?.rxBps ?? 0) + (s.net?.txBps ?? 0) > 64 * 1024,
+  });
+
   renderWeather(s.weather);
 
   renderGauge(
@@ -489,6 +893,11 @@ function render(s) {
     renderPing(s.ping);
   }
   if (config.ui.panels.media) renderMedia(s.media);
+  if (config.ui.panels.processes) renderProcesses(s.processes);
+  if (config.ui.panels.storage) renderStorage(s.storage ?? []);
+  if (config.ui.panels.trends) renderTrends(s.history, t);
+  if (config.ui.panels.forecast) renderForecast(s.weather);
+  if (config.ui.panels.pressure) renderPressure(s);
   if (config.ui.panels.footer) {
     renderSources(s.sources);
     renderDrives(s.drives ?? [], t.driveTemp);
@@ -517,22 +926,37 @@ function renderSafe(snapshot) {
 
 /* ── boot ──────────────────────────────────────────────────────── */
 
-function applyUiConfig() {
-  document.body.dataset.theme = config.theme || 'espresso';
-  document.body.dataset.glow = config.ui.glow ? 'on' : 'off';
-  document.body.dataset.scanlines = config.ui.scanlines ? 'on' : 'off';
-  for (const [panel, visible] of Object.entries(config.ui.panels)) {
-    el.hud.dataset[`hidden${panel[0].toUpperCase()}${panel.slice(1)}`] = String(
-      !visible,
-    );
+/**
+ * Everything the settings editor can change, applied without a reload.
+ *
+ * Panel visibility is handled by the deck rather than by collapsing elements
+ * with CSS: a hidden panel is simply never placed on a page, which means the
+ * remaining ones genuinely get its room instead of leaving a gap where it was.
+ */
+function applyConfig(next) {
+  config = next;
+  applyTheme(config);
+  deck.configure(config);
+  renderClock();
+
+  if (lastSnapshot) {
+    // A config change can arrive between snapshots, so redraw from the last one
+    // rather than leaving the new layout empty until the next tick — without
+    // letting that redraw pass for fresh data and reset the staleness clock.
+    const at = lastSnapshotAt;
+    renderSafe(lastSnapshot);
+    lastSnapshotAt = at;
   }
 }
 
-async function boot() {
-  config = await window.screenBuddy.getConfig();
-  applyUiConfig();
+function onSnapshot(snapshot) {
+  lastSnapshot = snapshot;
+  renderSafe(snapshot);
+}
 
-  renderClock();
+async function boot() {
+  applyConfig(await window.screenBuddy.getConfig());
+
   setInterval(renderClock, 250);
 
   // A dead feed dims the panel instead of freezing on stale numbers that still
@@ -543,10 +967,14 @@ async function boot() {
     }
   }, 1000);
 
-  window.screenBuddy.onSnapshot(renderSafe);
+  window.screenBuddy.onSnapshot(onSnapshot);
+
+  // Pushed by the settings editor. The panel is meant to be tuned while you
+  // watch it, so a change lands on the next frame rather than on a restart.
+  window.screenBuddy.onConfigChanged(applyConfig);
 
   const latest = await window.screenBuddy.getLatest();
-  if (latest) renderSafe(latest);
+  if (latest) onSnapshot(latest);
 }
 
 boot().catch((err) => {

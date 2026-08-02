@@ -41,11 +41,13 @@ const DECIMAL_SEPARATOR = (() => {
 
 const GROUP_SEPARATOR = DECIMAL_SEPARATOR === ',' ? '.' : ',';
 
+// Allows either decimal separator, and any spacing inside the number.
+const NUMERIC_RUN = /-?[\d.,   ]*\d/;
+
 function parseValue(raw) {
   if (typeof raw !== 'string') return null;
 
-  // Grab the numeric run, allowing either separator and any spacing inside it.
-  const m = raw.match(/-?[\d.,   ]*\d/);
+  const m = raw.match(NUMERIC_RUN);
   if (!m) return null;
 
   const normalized = m[0]
@@ -58,6 +60,34 @@ function parseValue(raw) {
   return Number.isFinite(v) ? v : null;
 }
 
+/** Whatever trails the number: "°C", "%", "KB/s", "GB". */
+function parseUnit(raw) {
+  if (typeof raw !== 'string') return null;
+  const m = raw.match(NUMERIC_RUN);
+  if (!m) return null;
+  return raw.slice(m.index + m[0].length).trim() || null;
+}
+
+const SCALE = { b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3, tb: 1024 ** 4 };
+
+/**
+ * Convert a value to bytes (or bytes per second) using the unit LHM printed
+ * beside it.
+ *
+ * This has to read the unit and cannot be a fixed multiplier: LHM rescales
+ * every reading independently, so one sensor reads "153,2 KB/s" on one poll and
+ * "1,5 MB/s" on the next. Taking the bare number would rank the 1.5 MB/s write
+ * as a hundred times smaller than the 153 KB/s one - a graph that moves
+ * convincingly and is entirely wrong. Binary multiples, which is what LHM
+ * formats with.
+ */
+function toBytes(value, unit) {
+  if (value === null || value === undefined || !unit) return null;
+  const m = /^([kmgt]?b)(\/s)?$/i.exec(unit.replace(/\s+/g, ''));
+  if (!m) return null;
+  return value * SCALE[m[1].toLowerCase()];
+}
+
 /** Walk the nested Children tree into a flat list of leaf sensors. */
 function flatten(node, out = []) {
   if (!node || typeof node !== 'object') return out;
@@ -67,6 +97,7 @@ function flatten(node, out = []) {
       text: String(node.Text ?? ''),
       type: String(node.Type),
       value: parseValue(node.Value),
+      unit: parseUnit(node.Value),
       max: parseValue(node.Max),
     });
   }
@@ -83,6 +114,80 @@ function pickFirst(sensors, predicates) {
     if (hit) return hit;
   }
   return null;
+}
+
+/* ── storage ───────────────────────────────────────────────
+   Everything the drives publish is already in the feed fetched for the CPU, so
+   it costs nothing extra. Worth having in full: Windows exposes no disk
+   throughput through systeminformation at all - fsStats() and disksIO() both
+   return null - so LHM is the only source of read/write rates here.
+
+   LHM groups storage under /nvme/N/ or /hdd/N/. The flattener keeps only a
+   sensor's own text and not its parent hardware node, whose model name is far
+   too long for the panel anyway, so drives are numbered in the order LHM
+   reports them. */
+
+const STORAGE_ID = /\/(nvme|hdd|ssd|storage)\/(\d+)\//i;
+
+function buildStorage(sensors) {
+  const byDrive = new Map();
+  for (const s of sensors) {
+    const m = STORAGE_ID.exec(s.id);
+    if (!m) continue;
+    const key = `${m[1].toLowerCase()}/${m[2]}`;
+    if (!byDrive.has(key)) {
+      byDrive.set(key, { kind: m[1].toLowerCase(), index: Number(m[2]), sensors: [] });
+    }
+    byDrive.get(key).sensors.push(s);
+  }
+
+  return [...byDrive.values()]
+    .sort((a, b) => a.index - b.index)
+    .map((drive, i) => {
+      const of = (type, re) =>
+        drive.sensors.find((s) => s.type === type && re.test(s.text) && s.value !== null);
+      const val = (type, re) => of(type, re)?.value ?? null;
+      const bytes = (type, re) => {
+        const hit = of(type, re);
+        return hit ? toBytes(hit.value, hit.unit) : null;
+      };
+
+      // NVMe drives publish their shutdown limits as temperature sensors:
+      // "Warning Temperature" (99 C) and "Critical Temperature" (109 C) are
+      // constants describing the hardware, not readings. Taking the hottest
+      // sensor per drive picks those every time and reports a healthy 48 C
+      // drive as 109 C. Composite is the NVMe spec's primary sensor and what
+      // every other tool quotes, so prefer it explicitly.
+      const temps = drive.sensors.filter(
+        (s) =>
+          s.type === 'Temperature' &&
+          s.value !== null &&
+          !/warning|critical|limit|threshold/i.test(s.text),
+      );
+      const temp =
+        temps.find((s) => /composite/i.test(s.text)) ??
+        temps.find((s) => /^temperature/i.test(s.text)) ??
+        temps[0] ??
+        null;
+
+      return {
+        label: `${drive.kind === 'nvme' ? 'NVME' : 'DISK'}${i}`,
+        kind: drive.kind,
+        tempC: temp?.value ?? null,
+        readBps: bytes('Throughput', /read/i),
+        writeBps: bytes('Throughput', /write/i),
+        usedPct: val('Load', /used space/i),
+        activityPct: val('Load', /total activity/i),
+        // "Life" is the drive's own estimate of remaining endurance; a drive
+        // reporting 6% left is the single most actionable number here and is
+        // invisible everywhere else on this panel.
+        lifePct: val('Level', /^life$/i),
+        freeBytes: bytes('Data', /free space/i),
+        totalBytes: bytes('Data', /total space/i),
+        readTotalBytes: bytes('Data', /data read/i),
+        writtenTotalBytes: bytes('Data', /data written/i),
+      };
+    });
 }
 
 const isCpuNode = (s) => /\/(amdcpu|intelcpu|cpu)\/\d+\//i.test(s.id);
@@ -152,48 +257,15 @@ function extract(sensors, { fanSensor = null } = {}) {
     (s) => s.type === 'Temperature' && /\/lpc\//i.test(s.id),
   ]);
 
-  // Drive temperatures are already in the feed we fetch for the CPU, so they
-  // cost nothing extra. LHM groups storage under /nvme/N/ or /hdd/N/, and the
-  // parent hardware node carries the model name, which is far too long for the
-  // panel — the flattener keeps only the sensor's own text, so number the
-  // drives in the order LHM reports them.
-  const driveTemps = sensors
-    .filter(
-      (s) =>
-        s.type === 'Temperature' &&
-        /\/(nvme|hdd|ssd|storage)\/\d+\//i.test(s.id) &&
-        s.value !== null &&
-        // NVMe drives publish their shutdown limits as temperature sensors:
-        // "Warning Temperature" (99 C) and "Critical Temperature" (109 C) are
-        // constants describing the hardware, not readings. Taking the hottest
-        // sensor per drive picks those every time and reports a healthy 48 C
-        // drive as 109 C.
-        !/warning|critical|limit|threshold/i.test(s.text),
-    )
-    .reduce((acc, s) => {
-      const drive = s.id.match(/\/(nvme|hdd|ssd|storage)\/(\d+)\//i);
-      const key = drive ? `${drive[1]}${drive[2]}` : s.id;
-      // Composite is the NVMe spec's primary sensor and the one every other
-      // tool reports; prefer it, then a plainly-named temperature, then
-      // whatever is left.
-      const rank = /composite/i.test(s.text) ? 0 : /^temperature/i.test(s.text) ? 1 : 2;
-      const prev = acc.get(key);
-      if (!prev || rank < prev.rank) {
-        acc.set(key, {
-          key,
-          rank,
-          kind: drive ? drive[1].toLowerCase() : 'disk',
-          tempC: s.value,
-        });
-      }
-      return acc;
-    }, new Map());
+  const storage = buildStorage(sensors);
 
   return {
-    drives: [...driveTemps.values()].map((d, i) => ({
-      label: `${d.kind === 'nvme' ? 'NVME' : 'DISK'}${i}`,
-      tempC: d.tempC,
-    })),
+    // Kept as its own field because the footer only ever wanted the
+    // temperature, and it should not have to know about the rest.
+    drives: storage
+      .filter((d) => d.tempC !== null)
+      .map((d) => ({ label: d.label, tempC: d.tempC })),
+    storage,
     cpuTempC: cpuTemp?.value ?? null,
     cpuTempLabel: cpuTemp?.text ?? null,
     cpuPowerW: cpuPower?.value ?? null,
@@ -264,4 +336,4 @@ class LhmSource {
   }
 }
 
-module.exports = { LhmSource, flatten, extract, parseValue };
+module.exports = { LhmSource, flatten, extract, parseValue, parseUnit, toBytes };

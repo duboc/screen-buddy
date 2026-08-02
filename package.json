@@ -14,7 +14,12 @@
     "shortcut": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-shortcut.ps1",
     "probe": "node scripts/probe-sensors.js",
     "displays": "electron scripts/list-displays.js",
-    "init-config": "electron scripts/init-config.js"
+    "themes": "node scripts/check-themes.mjs",
+    "init-config": "electron scripts/init-config.js",
+    "config:list": "node scripts/config-restore.js list",
+    "config:restore": "node scripts/config-restore.js restore",
+    "config:reset": "node scripts/config-restore.js reset",
+    "config:pin": "node scripts/config-restore.js pin"
   },
   "keywords": [
     "hud",

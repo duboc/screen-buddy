@@ -7,6 +7,10 @@ entirely, and shows what the machine is doing.
 Built for a small secondary panel — the 1024×600 boards sold as "sensor panels"
 are the reference size — but it fills whatever display you point it at.
 
+Six themes, a live [settings page](#settings) that previews every change on the
+panel before you commit it, and optional [page rotation](#rotating-pages) for
+panels too small to show everything at once.
+
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ ☕ COFFEE-MACHINE   Windows 11         ● READY   ON SINCE 1h 7m   19:34 04 │
@@ -76,6 +80,17 @@ reads — it never changes anything.
 | **Flow** | Network receive above the axis, transmit below, on one shared scale |
 | **Grinder** | Per-thread CPU load, one cell each — 32 cells on a 16-core part |
 | **Ready lamp** | READY / HEATING / OVER TEMP, from the worse of the two temperatures |
+
+Five more panels exist for [rotating pages](#rotating-pages), which is what makes
+room for them — they are not shown in the all-in-one layout:
+
+| Panel | Metrics |
+|---|---|
+| **Orders** | Which processes are actually using the CPU and the RAM, grouped by name and ranked |
+| **Log book** | Temperature and load over the last 15 minutes, with session peaks and time spent above the warn line |
+| **Portafilter** | Disk read/write rates, drive endurance, temperature and free space |
+| **Outside** | The next 12 hours and 5 days |
+| **Pressure** | Every fan header, board temperature, VCore, GPU power against its limit, swap |
 
 ## Requirements
 
@@ -199,11 +214,174 @@ Every entry here is a failure that actually happened on a real machine.
 | GPU panel empty | No NVIDIA GPU | Expected; LHM still supplies GPU temp and load |
 | Console window flashes at login | Autostart pointing at `npm` directly | The installer uses a `wscript` wrapper; re-run it |
 
+## Settings
+
+Right-click the tray icon and pick **Settings…**, or open
+<http://127.0.0.1:8787/>. Every change previews on the panel as you make it and
+nothing is written until you press save — you judge a colour or a font by
+looking at the panel, so the panel is the preview.
+
+It covers the base theme and every one of its colours, the type (face, scale,
+weight, tracking), which panels are shown, page rotation, thresholds, sensors
+and the window. Fields that need a restart say so.
+
+It is a small local HTTP service that writes `config.json` and nothing else: it
+runs no commands and reads no file outside its own directory. It binds to
+loopback, checks the `Host` header (so a web page you have open cannot reach it
+by pointing a DNS name at 127.0.0.1), requires a same-origin `Origin` on writes,
+and validates every value against a schema allowlist rather than merging what it
+is handed. Binding it to a LAN address requires `admin.token` and is refused
+without one. Set `admin.enabled` to `false` to not listen at all.
+
+### Themes
+
+Six, each a single stylesheet of custom properties. Set `theme`, or pick one in
+the settings page — and recolour any of them token by token with
+`ui.themeOverrides`, which layers on top so switching base themes keeps your edits.
+
+| Theme | | Character |
+|---|---|---|
+| `espresso` | dark | Warm brushed steel, brass trim, cream manometer dials |
+| `neon` | dark | The original cyberpunk treatment: cyan and magenta on near-black |
+| `blueprint` | dark | Cyanotype drawing board; the white paper dials are the only unblued objects on it |
+| `daylight` | **light** | Paper and ink — for a panel by a window, where a dark surface just reflects the room |
+| `slate` | dark | Flat graphite, no texture, no accent. Stays out of the way |
+| `phosphor` | dark | P1 oscilloscope tube: blue-green bloom, heavy scanlines, monospace |
+
+**Every status ramp is validated, not eyeballed.** Amber and red are adjacent
+hues that collapse under deuteranopia, so each theme's three steps are checked
+for lightness band, chroma floor, colour-vision separation, a normal-vision
+floor and contrast against that theme's own surface:
+
+```powershell
+npm run themes      # re-validate all six; exits non-zero on any failure
+```
+
+It reads the colours and the surface out of the stylesheets, so it cannot drift
+from what the panel renders — change a hex and this tells you whether it still
+passes. Each theme's header quotes its own numbers and the command that
+reproduces them.
+
+Two consequences worth knowing if you write your own:
+
+- **`daylight` is a selected light theme, not an inverted dark one.** Inverting a
+  dark palette gives marks far too light to hold 3:1 against paper. Its read
+  layer is *darker* than its mark layer — the opposite of every dark theme —
+  because on paper a thin mark has to be deepened, not lifted.
+- **A single-hue theme cannot have a validated three-step ramp.** The dark
+  lightness band is only 0.19 wide, so three shades of one hue land inside ΔE 6
+  of each other. That is why `phosphor` keeps a monochrome *body* but gives the
+  three data steps real hues — the honest version of a one-colour tube.
+
+### Rotating pages
+
+Off by default, and worth understanding before turning on. Rotation trades
+instant recognition for legibility. Most of what makes an ambient panel readable
+is that things stay put — you learn the boiler temperature is top-left and after
+that you stop looking properly — and rotation gives that up: some of the time
+the reading you want simply is not on screen, so a glance becomes a wait. Motion
+in the corner of your eye is also hard to ignore while you are doing something
+else.
+
+The point is not to show the same six panels at different sizes — that is a wait
+in exchange for nothing. Rotation buys **capacity**: pages carrying information
+the single-screen layout has no room for at all.
+
+| Page | Answers |
+|---|---|
+| **MACHINE** | The vitals: dials, RAM/VRAM, per-thread load |
+| **ORDERS** | *What is actually using the CPU and the RAM*, by process, grouped and ranked |
+| **LOG BOOK** | *How it got here*: temperature and load over the last 15 min, with peaks and time spent above the warn line |
+| **FLOW** | Network throughput **and disk read/write rates**, drive endurance and free space |
+| **OUTSIDE** | The next 12 hours and 5 days, not just the current reading in the bar |
+| **PRESSURE** | Every fan header, board temperature, VCore, GPU power against its limit |
+| **NOW BREWING** | The media session — skipped entirely when nothing is playing |
+
+Several of those are built from readings the panel was already taking and
+throwing away: every fan header, CPU voltage, board temperature, GPU power limit
+and swap were all in the sensor feed and drawn nowhere.
+
+Rotation also buys legibility. On a 1024×600 board a gauge gets 268px of height
+in the all-in-one layout and 480 on a page of its own, which is the difference
+between squinting and reading it from the far side of the room. Four things pay
+down the cost:
+
+- **The bar never rotates.** Clock, weather and ready lamp are always there.
+- **An alert takes over.** A critical reading pulls the gauges page forward and
+  holds it until it clears, so an alarm is never hidden on a page you are not
+  on. Configurable, including off.
+- **Conditional pages.** A page can require something to be true — the media
+  page only appears while something is playing, rather than showing an empty
+  frame two thirds of the time.
+- **Crossfade, not slide.** Direction is what makes motion catch the eye; the
+  default transition has none.
+
+Pages are lists of panels, edited in the settings page or in `ui.rotation.pages`.
+Each page should answer a different question; if two pages tell you the same
+thing, one of them is only costing you a wait.
+
+Two of the new panels need a source the others do not:
+
+- **ORDERS** reads processes through `scripts/processes-loop.ps1`. systeminformation's
+  `processes()` costs ~900ms of CPU per call and does not cache — an absurd price
+  for a panel whose job is to watch CPU rather than consume it. `Get-Process` is a
+  single API call, and the long-lived helper keeps the previous sample so it can
+  report real CPU percentages rather than cumulative processor-seconds.
+- **PORTAFILTER** takes disk throughput from LibreHardwareMonitor, because Windows
+  gives systeminformation nothing here — `fsStats()` and `disksIO()` both return
+  `null`. LHM already publishes read/write rates, endurance and free space in the
+  feed fetched for the CPU, so it costs no extra polling; without LHM the panel
+  has only what the footer already showed.
+
+### Type scale
+
+`ui.typography.scale` moves type, dial diameter and row heights together, so the
+layout stays in proportion instead of type outgrowing its plate. The panel is
+read from across a desk and how big "big" should be depends on the desk. Past
+about 1.2 the all-in-one layout runs out of room on a 1024×600 board — which is
+the point at which rotation starts to pay for itself.
+
+Fonts are local faces only. The HUD may boot before the network is up and its
+CSP forbids remote resources, so a webfont would be a blank panel waiting on a
+download that never arrives.
+
 ## Configuration
 
-Everything lives in `config.json` (gitignored — your copy stays yours).
+Everything the settings page writes lives in `config.json` (gitignored — your
+copy stays yours), and it is a plain file you can edit by hand instead.
 `config.example.json` is the annotated template listing every key with defaults
-and an explanation.
+and an explanation. Saving from the settings page merges only what you changed
+and keeps the `$comment` documentation intact.
+
+### Rolling back
+
+Every save takes a restore point first, so any change can be undone — including
+a reset, which snapshots the configuration it is about to replace. They live in
+`config.backups/` as plain timestamped JSON.
+
+```powershell
+npm run config:list                      # what you can go back to
+npm run config:restore                   # undo the last change
+npm run config:restore -- <id>           # go back to a specific one
+npm run config:pin -- "before neon"      # name one; never pruned automatically
+npm run config:reset                     # theme and layout only
+npm run config:reset -- --all            # everything, back to the template
+```
+
+The same list is in the settings page under **Backups**, but the CLI is the one
+that matters: the moment you most need to undo a config change is the moment the
+app will not start because of it, so the recovery tool deliberately runs without
+Electron and works with screen-buddy stopped.
+
+Twelve automatic snapshots are kept, pruned oldest-first; pinned ones are never
+pruned. `npm run config:reset` keeps your display, window and sensor setup and
+resets only how the panel looks — that is usually the reset you actually want,
+and it means experimenting with themes can never cost you your monitor pinning.
+
+There is always at least one way back. `config.example.json` is tracked in git,
+so **shipped defaults** is available even with `config.backups/` deleted, and if
+the template itself is missing the defaults compiled into the app are used
+instead.
 
 ```powershell
 npm run init-config              # generate from your actual displays
@@ -217,11 +395,17 @@ The settings worth knowing:
 | Key | Why you'd change it |
 |---|---|
 | `display.strategy` | `smallest` (default, needs no config), `bounds` (pin a monitor by position), `index`, `primary`, `largest` |
-| `theme` | `espresso` (default) or `neon` for the original cyberpunk look |
+| `theme` | One of six; see Themes below |
+| `ui.themeOverrides.*` | Override any of the theme's colours; layered on top, so switching themes keeps your edits |
+| `ui.typography.*` | Face, scale, numeral weight, label tracking |
+| `ui.rotation.*` | Cycle pages instead of showing everything at once |
+| `ui.history.windowMinutes` | How much past the Log Book panel keeps |
+| `sensors.processes.*` | The process list behind the Orders panel |
 | `window.clickThrough` | `false` to let the HUD accept clicks |
 | `window.alwaysOnTop` | `false` to let other windows cover it |
 | `polling.fastMs` | Refresh rate. 1000 default; 500 is smoother and costs more CPU |
 | `ui.panels.*` | Hide whole sections; the rest expands to fill |
+| `admin.*` | The settings page: port, bind address, or `enabled: false` to turn it off |
 | `thresholds.*` | Where the dial's danger zone starts and the lamp changes state |
 | `sensors.libreHardwareMonitor.fanSensor` | Pin which fan header to display |
 | `sensors.network.interface` | Pin a network adapter by exact name |
@@ -244,7 +428,18 @@ npm run displays   # what Electron thinks your monitors are
 
 `src/renderer/styles/base.css` is structure only; every colour and material is a
 custom property defined in a theme file. To add a theme, copy
-`theme-espresso.css`, change the values, and set `theme` in your config.
+`theme-espresso.css`, change the values, and set `theme` in your config. The
+settings page reads its "unset" colours straight out of those stylesheets, so a
+new theme needs no second declaration anywhere.
+
+`src/main/schema.js` is the single description of what can be configured: it
+generates the settings form *and* is the allowlist the server validates writes
+against. Adding a field there is all it takes for it to appear in the editor and
+become writable — and a path that is not in it cannot be written at all.
+
+`src/renderer/js/deck.js` owns page layout. With rotation off it builds exactly
+one page whose rows reproduce the original grid, so there is only ever one
+layout code path and turning the feature off is pixel-neutral.
 
 Scripts are ASCII-only on purpose: Windows PowerShell 5.1 reads `.ps1` files as
 ANSI unless they carry a BOM, so a stray em dash turns into mojibake in the
@@ -271,7 +466,7 @@ band, chroma floor, colour-vision-deficiency separation, normal-vision
 separation and contrast:
 
 ```
-node scripts/validate_palette.js "#4795c0,#bf8a24,#c2392e" \
+node scripts/validate_palette.mjs "#4795c0,#bf8a24,#c2392e" \
      --mode dark --surface "#17120f" --pairs all
 ```
 

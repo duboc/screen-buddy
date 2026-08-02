@@ -67,26 +67,75 @@
       "intervalMs": 10000,
       "timeoutMs": 3000,
       "samples": 3
+    },
+
+    "$processes": "Feeds the ORDERS panel: which processes are actually using the CPU and the RAM, grouped by name. Read through a PowerShell helper rather than systeminformation, whose processes() call costs about 900ms of CPU every time and does not cache - an absurd price for a panel whose job is to watch CPU, not consume it. The helper holds the previous sample and derives real CPU percentages itself; see scripts/processes-loop.ps1.",
+    "processes": {
+      "enabled": true,
+      "intervalMs": 3000,
+      "top": 6
     }
   },
 
-  "$theme": "espresso (warm brushed steel, cream manometer dials) or neon (cyan/magenta cyberpunk)",
+  "$theme": "espresso (warm brushed steel, cream manometer dials), neon (cyan/magenta cyberpunk), blueprint (cyanotype board, white paper dials), daylight (paper and ink - the light theme, for a panel by a window), slate (flat graphite, no texture, stays out of the way), or phosphor (P1 oscilloscope tube: blue-green bloom, scanlines, monospace). Any of them can be recoloured token by token via ui.themeOverrides below, or from the settings page. Every status ramp is validated for colour-vision separation and contrast against its own surface - run `npm run themes` to re-check them.",
   "theme": "espresso",
 
   "ui": {
-    "$comment": "panels can hide whole sections; the rest expands to fill the space.",
+    "$comment": "Everything below is editable live from the settings page (tray icon > Settings...), which previews each change on the panel before you commit it. Editing here by hand works exactly the same; the file is the source of truth either way.",
     "showSeconds": true,
     "clock24h": true,
     "scanlines": false,
     "glow": true,
     "historySamples": 90,
+
+    "$panels": "Hides whole sections. A hidden panel is never placed on a page at all, so the remaining ones get its room rather than leaving a gap.",
     "panels": {
       "gauges": true,
       "reservoir": true,
       "media": true,
       "network": true,
       "cores": true,
-      "footer": true
+      "footer": true,
+      "processes": true,
+      "storage": true,
+      "trends": true,
+      "forecast": true,
+      "pressure": true
+    },
+
+    "$history": "How much past the LOG BOOK panel keeps. Costs nothing to collect: these are the readings the panel already takes every second and used to throw away. Kept in the main process, so peaks survive a HUD reload - a peak that silently resets on reload is worse than no peak, because it still looks authoritative.",
+    "history": { "windowMinutes": 15, "points": 60 },
+
+    "$typography": "This panel is read from across a desk, so how big 'big' should be depends on the desk. scale drives type, dial diameter and row heights together, so raising it keeps the layout in proportion instead of letting type outgrow its plate. Past about 1.2 the all-in-one layout runs out of height, which is the point at which rotation starts to pay for itself. family/numerals take a preset id ('bahnschrift', 'consolas', 'segoe', ... - the settings page lists them all) or a raw CSS font stack; null means the theme's own choice. Local faces only: the HUD may boot with no network, so a webfont would be a blank panel waiting on a download.",
+    "typography": {
+      "family": null,
+      "numerals": null,
+      "scale": 1.0,
+      "numeralWeight": 300,
+      "letterSpacing": 0.14,
+      "tabularNums": true
+    },
+
+    "$themeOverrides": "Layered on top of whichever base theme is selected, so switching themes keeps your edits. Keys are the theme's custom properties without the leading dashes: brass, surface, ink, mark-crit, dial-face and so on. Halos are derived from the readout colours rather than set here. Anything not listed falls back to the theme.",
+    "themeOverrides": {},
+
+    "$rotation": "Cycling pages trades instant recognition for legibility. Spatial constancy is most of what makes an ambient panel readable - you learn where a number lives and stop having to look properly - and rotation gives that up: some of the time the reading you want is simply not on screen. It earns its place on a panel too small to hold everything legibly, and the cost is paid down three ways: the bar never rotates, alertOverride pulls the gauges page forward and holds it while a reading is out of range, and a page with a 'when' condition is skipped rather than shown empty. transition 'fade' is the default because direction is what makes motion hard to ignore out of the corner of your eye. Off here keeps the classic single-screen layout, pixel for pixel.",
+    "rotation": {
+      "enabled": false,
+      "dwellSec": 20,
+      "transition": "fade",
+      "transitionMs": 600,
+      "alertOverride": "crit",
+      "indicator": true,
+      "$pages": "Each page should answer a DIFFERENT question. Rotation is only worth its cost if waiting for the next page gets you something you could not already see; a set of pages showing the same panels at different sizes is a wait in exchange for nothing. The five panels below the classic six exist only because rotation made room for them: processes (what is using the CPU and RAM), storage (disk read/write rates, endurance, free space), trends (temperature and load over time, with peaks and time-above-threshold), forecast (next 12 hours and 5 days), pressure (every fan header, board temp, VCore, GPU power headroom).",
+      "pages": [
+        { "id": "machine", "title": "MACHINE", "panels": ["gauges", "reservoir", "cores"] },
+        { "id": "orders", "title": "ORDERS", "panels": ["processes", "cores"] },
+        { "id": "logbook", "title": "LOG BOOK", "panels": ["trends", "footer"] },
+        { "id": "flow", "title": "FLOW", "panels": ["network", "storage"] },
+        { "id": "outside", "title": "OUTSIDE", "panels": ["forecast"] },
+        { "id": "media", "title": "NOW BREWING", "panels": ["media"], "when": "media" }
+      ]
     }
   },
 
@@ -103,5 +152,13 @@
   "power": {
     "$comment": "Holds off the display-sleep timer so the HUD monitor stays lit and Windows never reshuffles your windows off it.",
     "preventDisplaySleep": true
+  },
+
+  "admin": {
+    "$comment": "The settings page, reachable from the tray icon. It writes config.json and nothing else - it runs no commands and reads no file outside its own directory. Bound to loopback, where only this machine can reach it. Binding it to a LAN address requires a token to be set first and is refused without one; the service also checks the Host and Origin headers, so a web page you have open cannot reach it or rewrite your config. Set enabled to false to not listen at all.",
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8787,
+    "token": null
   }
 }

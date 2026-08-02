@@ -1,0 +1,680 @@
+/* ── screen-buddy settings ────────────────────────────────────────
+   A local editor for a panel you are looking at while you use it. It borrows
+   the HUD's material — warm steel, brass trim — but not its sizing: this is
+   read at desk distance from a browser, so it is a normal-sized UI.
+
+   Deliberately not theme-aware. The editor's job includes showing you what a
+   colour will look like; if the editor itself changed colour along with the
+   swatches, you would have no fixed reference to judge them against. */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #14100d;
+  --panel: #1e1814;
+  --panel-2: #262019;
+  --edge: #3a2f26;
+  --edge-soft: #2c241d;
+
+  --ink: #f2e7d6;
+  --ink-dim: #b3a48f;
+  --ink-muted: #8d7c68;
+  --ink-faint: #5e5145;
+
+  --brass: #c8a05a;
+  --ok: #4795c0;
+  --warn: #bf8a24;
+  --crit: #c2392e;
+
+  --radius: 6px;
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: grid;
+  /* The save bar is pinned; only the sheet scrolls, so the state of your edits
+     is never scrolled off the screen. */
+  grid-template-rows: auto auto 1fr auto;
+}
+
+/* ── top ─────────────────────────────────────────────────────── */
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--edge);
+  background: var(--panel);
+}
+
+.top__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+.top__brand em {
+  font-style: normal;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+.top__cup {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pulse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.pulse__dot[data-state='live'] {
+  background: var(--ok);
+  box-shadow: 0 0 6px rgba(71, 149, 192, 0.6);
+}
+
+.pulse__dot[data-state='down'] {
+  background: var(--crit);
+}
+
+/* ── tabs ────────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--edge);
+  background: var(--panel);
+  overflow-x: auto;
+}
+
+.tab {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--ink-dim);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--ink);
+  border-bottom-color: var(--brass);
+}
+
+/* ── sheet ───────────────────────────────────────────────────── */
+
+.sheet {
+  overflow-y: auto;
+  padding: 22px 20px 40px;
+}
+
+.loading {
+  color: var(--ink-muted);
+}
+
+.section {
+  max-width: 940px;
+  margin: 0 auto;
+}
+
+.section__blurb {
+  color: var(--ink-dim);
+  margin-bottom: 20px;
+  max-width: 68ch;
+}
+
+.group {
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.group__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+/* ── fields ──────────────────────────────────────────────────── */
+
+.field {
+  display: grid;
+  grid-template-columns: minmax(150px, 240px) 1fr;
+  gap: 6px 18px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.field:last-child {
+  border-bottom: 0;
+}
+
+.field__label {
+  font-weight: 600;
+}
+
+.field__tag {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--warn);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 4px;
+  vertical-align: 1px;
+}
+
+.field__help {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--ink-muted);
+  max-width: 74ch;
+}
+
+.field__control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+input[type='text'],
+input[type='number'],
+select {
+  appearance: none;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 13px;
+  min-width: 0;
+  width: 100%;
+  max-width: 380px;
+}
+
+/* appearance:none strips the native caret too, so it has to be drawn back on —
+   without it a select is indistinguishable from a text field. */
+select {
+  cursor: pointer;
+  padding-right: 28px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
+    linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+input[type='number'] {
+  max-width: 130px;
+  font-variant-numeric: tabular-nums;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 1px;
+}
+
+input[type='range'] {
+  flex: 1;
+  max-width: 300px;
+  accent-color: var(--brass);
+}
+
+.field__value {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-dim);
+  min-width: 74px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Switch: the state is carried by position AND by the word beside it, never by
+   colour alone. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch__track {
+  width: 38px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--edge);
+  position: relative;
+  transition: background 160ms linear;
+  flex: none;
+}
+
+.switch__track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  transition: transform 160ms ease, background 160ms linear;
+}
+
+.switch input:checked + .switch__track {
+  background: rgba(200, 160, 90, 0.22);
+  border-color: var(--brass);
+}
+
+.switch input:checked + .switch__track::after {
+  transform: translateX(18px);
+  background: var(--brass);
+}
+
+.switch input:focus-visible + .switch__track {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+.switch__word {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: 700;
+  min-width: 26px;
+}
+
+.switch input:checked ~ .switch__word {
+  color: var(--brass);
+}
+
+/* ── colour tokens ───────────────────────────────────────────── */
+
+.tokens {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.token {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.token__name {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--ink-dim);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.token__name code {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+.token__swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid var(--edge);
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+  flex: none;
+}
+
+.token__swatch input {
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}
+
+.token__text {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.token__reset {
+  appearance: none;
+  border: 1px solid var(--edge);
+  background: var(--panel-2);
+  color: var(--ink-muted);
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.token__reset:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--brass);
+}
+
+.token__reset:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.token.is-overridden .token__name {
+  color: var(--brass);
+}
+
+/* ── pages editor ────────────────────────────────────────────── */
+
+.pages {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.page-card {
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.page-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.page-card__ord {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  min-width: 18px;
+}
+
+.page-card__head input[type='text'] {
+  max-width: 220px;
+}
+
+.page-card__head select {
+  max-width: 260px;
+}
+
+.page-card__spacer {
+  flex: 1;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--edge);
+  border-radius: 20px;
+  padding: 4px 12px 4px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--ink-muted);
+  background: var(--bg);
+}
+
+.chip input {
+  accent-color: var(--brass);
+  margin: 0;
+}
+
+.chip:has(input:checked) {
+  color: var(--ink);
+  border-color: var(--brass);
+  background: rgba(200, 160, 90, 0.12);
+}
+
+.chip small {
+  color: var(--ink-faint);
+}
+
+/* ── buttons ─────────────────────────────────────────────────── */
+
+.btn {
+  appearance: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--edge);
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  border-radius: 4px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--brass);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn--primary {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #1a1309;
+}
+
+.btn--primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  color: #1a1309;
+}
+
+.btn--small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.btn--danger:hover:not(:disabled) {
+  border-color: var(--crit);
+  color: var(--crit);
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--edge-soft);
+  flex-wrap: wrap;
+}
+
+/* ── save bar ────────────────────────────────────────────────── */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--edge);
+  background: var(--panel);
+}
+
+.bar__status {
+  font-size: 12px;
+  color: var(--ink-muted);
+  max-width: 72ch;
+}
+
+.bar__status[data-tone='dirty'] {
+  color: var(--warn);
+}
+
+.bar__status[data-tone='saved'] {
+  color: var(--ok);
+}
+
+.bar__status[data-tone='error'] {
+  color: var(--crit);
+}
+
+.bar__actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+@media (max-width: 620px) {
+  .field {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── restore points ──────────────────────────────────────────── */
+
+.restore {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.restore:last-child {
+  border-bottom: 0;
+}
+
+.restore__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.restore__label {
+  font-weight: 600;
+}
+
+.restore__meta {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.restore__id {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+}
+
+/* The shipped template is the one entry that is not a file and cannot be
+   deleted — which is exactly what makes it the guaranteed floor. */
+.restore--shipped {
+  background: rgba(71, 149, 192, 0.06);
+}
+
+.restore--pinned .restore__label {
+  color: var(--brass);
+}
+
+.restore__actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+/* Armed confirmation state: the second click is the one that acts. */
+.btn--armed {
+  border-color: var(--warn);
+  color: var(--warn);
+}

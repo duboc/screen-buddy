@@ -1,0 +1,156 @@
+/* ── theme: daylight ─────────────────────────────────────────────
+   The one light theme, and the reason it exists: every other theme assumes a
+   dim room. A panel on a desk by a window is washed out by its own darkness —
+   a dark surface reflects the room instead of showing the reading. Paper does
+   not have that problem.
+
+   This is a SELECTED light theme, not the dark ones inverted. Inverting a dark
+   palette produces marks that are far too light to hold 3:1 against paper, so
+   every step here was re-chosen against this surface:
+
+     node scripts/validate_palette.mjs "#1a5f96,#b08400,#94170f" \
+          --mode light --surface "#f4f1ea" --pairs all
+     → lightness band PASS · chroma floor PASS · CVD separation PASS
+       (worst all-pairs ΔE 19.8 deutan, 21.1 tritan) · normal-vision PASS
+       (25.0) · contrast vs surface PASS (all ≥ 3:1)
+
+   Two inversions of the usual rules follow from the surface being light:
+
+     · The read layer is DARKER than the mark layer, not lighter. On a dark
+       body a thin mark has to be lifted to stay visible; on paper it has to be
+       deepened. "Lift the readout" is a fact about dark surfaces, not a law.
+     · Glow is nearly absent. A halo is light bleeding out of a lit object, and
+       nothing here is lit — on paper the same effect reads as a smudge. The
+       halos below are barely-there ink spread, and turning glow off loses
+       nothing at all. */
+
+body[data-theme='daylight'] {
+  color-scheme: light;
+
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+
+  /* paper */
+  --surface: #f4f1ea;
+  --plate-bg: linear-gradient(177deg, #fffefb 0%, #fbf9f4 100%);
+  --plate-edge: #d8d2c6;
+  /* No sheen: a highlight along the top edge is how brushed metal catches a
+     light source, and paper does not. */
+  --plate-sheen: transparent;
+  /* A real cast shadow instead of an inner highlight — on light, depth comes
+     from the plate sitting above the surface rather than from being lit. */
+  --plate-shadow: 0 1px 2px rgba(60, 50, 30, 0.07), 0 3px 10px rgba(60, 50, 30, 0.06);
+  --plate-radius: 5px;
+  --rule: #ded8cb;
+
+  /* ink — dark on light, so the ramp runs the other way from the dark themes */
+  --ink: #1f1c16;
+  --ink-title: #4a4234;
+  --ink-dim: #5c5344;
+  --ink-muted: #7d7361;
+  --ink-faint: #a89e8b;
+
+  --brass: #8a6a1f;
+
+  /* mark layer — validated against paper */
+  --mark-nominal: #1a5f96;
+  --mark-warn: #b08400;
+  --mark-crit: #94170f;
+
+  /* Deepened, not lifted. See the header. */
+  --read-nominal: #124a77;
+  --read-warn: #7d5d00;
+  --read-crit: #7a1009;
+
+  /* Ink spread, not light bleed. Deliberately weak. */
+  --halo-nominal: rgba(26, 95, 150, 0.16);
+  --halo-warn: rgba(176, 132, 0, 0.16);
+  --halo-crit: rgba(148, 23, 15, 0.18);
+
+  /* A printed instrument face: slightly cooler than the plate so the dial
+     still reads as a separate object rather than a hole in the paper. */
+  --dial-face: #ffffff;
+  --dial-rim: #b6ae9c;
+  --dial-ink: #2a2419;
+  --zone-crit: #94170f;
+  --needle: #94170f;
+  --needle-hub: #6f6552;
+
+  /* vessels & wells — recessed, so they go DARKER than the plate */
+  --tank-well: #e6e1d5;
+  --tank-edge: #cdc6b6;
+  --tank-graduation: #b3ab98;
+  --lamp-well: #ece7dc;
+  --art-well: #eeeae0;
+
+  --flow-stroke: #8a6a1f;
+  --flow-fill: rgba(138, 106, 31, 0.16);
+
+  --ok: #1a5f96;
+  --ok-halo: rgba(26, 95, 150, 0.25);
+
+  /* defaults; JS repoints these per element via data-status */
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+  --cell-mark: var(--mark-nominal);
+
+  /* Paper fibre. Multiply rather than overlay: on a light surface an overlay
+     blend brightens instead of texturing, which is the opposite of the point. */
+  --grain-display: block;
+  --grain-blend: multiply;
+  --grain-opacity: 0.5;
+  --grain-bg: repeating-linear-gradient(
+    92deg,
+    rgba(120, 100, 70, 0.035) 0px,
+    rgba(120, 100, 70, 0.035) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+body[data-theme='daylight'] [data-status='nominal'] {
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+}
+
+body[data-theme='daylight'] [data-status='warn'] {
+  --status-mark: var(--mark-warn);
+  --status-read: var(--read-warn);
+  --status-halo: var(--halo-warn);
+}
+
+body[data-theme='daylight'] [data-status='crit'] {
+  --status-mark: var(--mark-crit);
+  --status-read: var(--read-crit);
+  --status-halo: var(--halo-crit);
+}
+
+/* Thread cells are too small for a numeral, so they stay on the mark layer:
+   three discrete steps, never a continuous ramp. */
+body[data-theme='daylight'] .strip__cell[data-status='nominal'] i {
+  --cell-mark: var(--mark-nominal);
+}
+body[data-theme='daylight'] .strip__cell[data-status='warn'] i {
+  --cell-mark: var(--mark-warn);
+}
+body[data-theme='daylight'] .strip__cell[data-status='crit'] i {
+  --cell-mark: var(--mark-crit);
+}
+
+/* The lamp bulb is a filled dot on a pale well; on paper it needs an outline to
+   read as an object rather than as a printing flaw. */
+body[data-theme='daylight'] .lamp__bulb {
+  box-shadow: 0 0 0 1px rgba(60, 50, 30, 0.18);
+}
+
+body[data-theme='daylight'][data-glow='off'] {
+  --halo-nominal: transparent;
+  --halo-warn: transparent;
+  --halo-crit: transparent;
+  --ok-halo: transparent;
+}
+
+body[data-theme='daylight'][data-scanlines='off'] {
+  --grain-display: none;
+}

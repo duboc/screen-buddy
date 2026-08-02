@@ -10,10 +10,18 @@
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/theme-espresso.css" />
     <link rel="stylesheet" href="styles/theme-neon.css" />
+    <link rel="stylesheet" href="styles/theme-blueprint.css" />
+    <link rel="stylesheet" href="styles/theme-daylight.css" />
+    <link rel="stylesheet" href="styles/theme-slate.css" />
+    <link rel="stylesheet" href="styles/theme-phosphor.css" />
   </head>
   <body data-theme="espresso">
     <div class="hud" id="hud">
-      <!-- ── machine bar ─────────────────────────────────────────── -->
+      <!-- ── machine bar ─────────────────────────────────────────────
+           Never rotates. The clock, the weather and the ready lamp stay
+           in one place whatever the deck below is showing, so the two
+           things you might need at a glance are never the ones being
+           waited on. -->
       <header class="bar">
         <div class="bar__brand">
           <svg class="bar__cup" viewBox="0 0 24 24" aria-hidden="true">
@@ -27,6 +35,9 @@
             <path class="cup__saucer" d="M2 21h15" />
           </svg>
           <span class="bar__name" id="host">—</span>
+          <!-- Position in the rotation. Without it a deck held on one page by
+               an alert is indistinguishable from a frozen panel. -->
+          <div class="dots" id="deck-dots" hidden></div>
         </div>
 
         <!-- Weather sits in the bar's dead centre space. Hidden entirely
@@ -68,8 +79,21 @@
         </div>
       </header>
 
-      <!-- ── gauges + reservoir ──────────────────────────────────── -->
-      <section class="row-gauges" id="panel-gauges">
+      <!-- Pages are assembled here at boot from the store below. With rotation
+           off there is exactly one page and it is the classic layout. -->
+      <div class="deck" id="deck"></div>
+
+      <div class="grain" aria-hidden="true"></div>
+    </div>
+
+    <!-- ── panel store ───────────────────────────────────────────────
+         Every panel is a single self-contained root with a data-panel name.
+         The deck moves these nodes into whichever page claims them, so a
+         panel keeps its identity — and the element references app.js holds —
+         no matter which page it ends up on. Hidden so nothing flashes
+         unstyled while the deck is being built. -->
+    <div id="panel-store" hidden>
+      <section class="unit unit--gauges" data-panel="gauges">
         <article class="gauge plate" id="gauge-cpu">
           <div class="plate__head">
             <span class="plate__title">BOILER</span>
@@ -141,111 +165,107 @@
             <div><span class="micro">FAN</span><b data-field="fan">--</b></div>
           </div>
         </article>
-
-        <article class="plate reservoir" id="panel-reservoir">
-          <div class="plate__head">
-            <span class="plate__title">RESERVOIR</span>
-          </div>
-          <div class="tanks">
-            <div class="tank" data-tank="mem">
-              <div class="tank__glass">
-                <i class="tank__fill"></i>
-                <span class="tank__mark tank__mark--hi"></span>
-                <span class="tank__mark tank__mark--mid"></span>
-                <span class="tank__mark tank__mark--lo"></span>
-              </div>
-              <span class="tank__pct" data-field="pct">--</span>
-              <span class="micro">RAM</span>
-              <span class="tank__abs" data-field="abs">--</span>
-            </div>
-            <div class="tank" data-tank="vram">
-              <div class="tank__glass">
-                <i class="tank__fill"></i>
-                <span class="tank__mark tank__mark--hi"></span>
-                <span class="tank__mark tank__mark--mid"></span>
-                <span class="tank__mark tank__mark--lo"></span>
-              </div>
-              <span class="tank__pct" data-field="pct">--</span>
-              <span class="micro">VRAM</span>
-              <span class="tank__abs" data-field="abs">--</span>
-            </div>
-          </div>
-        </article>
       </section>
 
-      <!-- ── now playing + flow ──────────────────────────────────── -->
-      <section class="row-mid">
-        <article class="plate media" id="panel-media">
-          <div class="plate__head">
-            <span class="plate__title">NOW BREWING</span>
-            <span class="plate__sub" id="media-app"></span>
-            <span class="media__state" id="media-state"></span>
-          </div>
-          <div class="media__body">
-            <div class="media__art" id="media-art">
-              <svg viewBox="0 0 48 48" aria-hidden="true">
-                <circle class="art__disc" cx="24" cy="24" r="17" />
-                <circle class="art__hole" cx="24" cy="24" r="4" />
-                <path class="art__note" d="M20 30V17l11-2.4V28" />
-              </svg>
+      <article class="plate reservoir" data-panel="reservoir">
+        <div class="plate__head">
+          <span class="plate__title">RESERVOIR</span>
+        </div>
+        <div class="tanks">
+          <div class="tank" data-tank="mem">
+            <div class="tank__glass">
+              <i class="tank__fill"></i>
+              <span class="tank__mark tank__mark--hi"></span>
+              <span class="tank__mark tank__mark--mid"></span>
+              <span class="tank__mark tank__mark--lo"></span>
             </div>
-            <div class="media__text">
-              <p class="media__title" id="media-title">Nothing playing</p>
-              <p class="media__artist" id="media-artist"></p>
-              <p class="media__album" id="media-album"></p>
+            <span class="tank__pct" data-field="pct">--</span>
+            <span class="micro">RAM</span>
+            <span class="tank__abs" data-field="abs">--</span>
+          </div>
+          <div class="tank" data-tank="vram">
+            <div class="tank__glass">
+              <i class="tank__fill"></i>
+              <span class="tank__mark tank__mark--hi"></span>
+              <span class="tank__mark tank__mark--mid"></span>
+              <span class="tank__mark tank__mark--lo"></span>
             </div>
+            <span class="tank__pct" data-field="pct">--</span>
+            <span class="micro">VRAM</span>
+            <span class="tank__abs" data-field="abs">--</span>
           </div>
-          <div class="media__progress">
-            <span class="media__time" id="media-pos">--</span>
-            <div class="media__track"><i class="media__fill" id="media-fill"></i></div>
-            <span class="media__time" id="media-end">--</span>
-          </div>
-        </article>
+        </div>
+      </article>
 
-        <article class="plate flow" id="panel-network">
-          <div class="plate__head">
-            <span class="plate__title">FLOW</span>
-            <span class="plate__sub" id="net-iface"></span>
+      <article class="plate media" data-panel="media">
+        <div class="plate__head">
+          <span class="plate__title">NOW BREWING</span>
+          <span class="plate__sub" id="media-app"></span>
+          <span class="media__state" id="media-state"></span>
+        </div>
+        <div class="media__body">
+          <div class="media__art" id="media-art">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <circle class="art__disc" cx="24" cy="24" r="17" />
+              <circle class="art__hole" cx="24" cy="24" r="4" />
+              <path class="art__note" d="M20 30V17l11-2.4V28" />
+            </svg>
           </div>
-          <div class="flow__reads">
-            <div class="flow__read">
-              <span class="flow__arrow">↓</span>
-              <span class="flow__num" id="net-rx">--</span>
-              <span class="flow__unit" id="net-rx-unit"></span>
-            </div>
-            <div class="flow__read">
-              <span class="flow__arrow">↑</span>
-              <span class="flow__num" id="net-tx">--</span>
-              <span class="flow__unit" id="net-tx-unit"></span>
-            </div>
+          <div class="media__text">
+            <p class="media__title" id="media-title">Nothing playing</p>
+            <p class="media__artist" id="media-artist"></p>
+            <p class="media__album" id="media-album"></p>
           </div>
-          <!-- Receive above the axis, transmit below, on one shared scale.
-               Identity is position plus the labels above, not hue. -->
-          <svg
-            class="flow__plot"
-            viewBox="0 0 300 52"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <line class="flow__axis" x1="0" y1="26" x2="300" y2="26" />
-            <path class="flow__area" id="net-area-rx" />
-            <path class="flow__line" id="net-line-rx" />
-            <path class="flow__area" id="net-area-tx" />
-            <path class="flow__line" id="net-line-tx" />
-          </svg>
-          <div class="flow__scale">
-            <span class="micro">PEAK</span>
-            <span id="net-peak">--</span>
-            <span class="flow__ping" id="ping" data-status="nominal">
-              <span class="micro">PING</span>
-              <span id="ping-value">--</span>
-            </span>
-          </div>
-        </article>
-      </section>
+        </div>
+        <div class="media__progress">
+          <span class="media__time" id="media-pos">--</span>
+          <div class="media__track"><i class="media__fill" id="media-fill"></i></div>
+          <span class="media__time" id="media-end">--</span>
+        </div>
+      </article>
 
-      <!-- ── thread strip ────────────────────────────────────────── -->
-      <section class="plate strip" id="panel-cores">
+      <article class="plate flow" data-panel="network">
+        <div class="plate__head">
+          <span class="plate__title">FLOW</span>
+          <span class="plate__sub" id="net-iface"></span>
+        </div>
+        <div class="flow__reads">
+          <div class="flow__read">
+            <span class="flow__arrow">↓</span>
+            <span class="flow__num" id="net-rx">--</span>
+            <span class="flow__unit" id="net-rx-unit"></span>
+          </div>
+          <div class="flow__read">
+            <span class="flow__arrow">↑</span>
+            <span class="flow__num" id="net-tx">--</span>
+            <span class="flow__unit" id="net-tx-unit"></span>
+          </div>
+        </div>
+        <!-- Receive above the axis, transmit below, on one shared scale.
+             Identity is position plus the labels above, not hue. -->
+        <svg
+          class="flow__plot"
+          viewBox="0 0 300 52"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <line class="flow__axis" x1="0" y1="26" x2="300" y2="26" />
+          <path class="flow__area" id="net-area-rx" />
+          <path class="flow__line" id="net-line-rx" />
+          <path class="flow__area" id="net-area-tx" />
+          <path class="flow__line" id="net-line-tx" />
+        </svg>
+        <div class="flow__scale">
+          <span class="micro">PEAK</span>
+          <span id="net-peak">--</span>
+          <span class="flow__ping" id="ping" data-status="nominal">
+            <span class="micro">PING</span>
+            <span id="ping-value">--</span>
+          </span>
+        </div>
+      </article>
+
+      <section class="plate strip" data-panel="cores">
         <div class="strip__label">
           <span class="plate__title">GRINDER</span>
           <span class="micro" id="cores-count"></span>
@@ -253,16 +273,99 @@
         <div class="strip__grid" id="cores-grid"></div>
       </section>
 
-      <!-- ── footer ──────────────────────────────────────────────── -->
-      <footer class="foot" id="panel-footer">
+      <!-- ── what is actually responsible ──────────────────────────
+           The panel could always say the machine was at 80% and 84 C, but not
+           what was doing it, which is the next question every time. -->
+      <article class="plate procs" data-panel="processes">
+        <div class="plate__head">
+          <span class="plate__title">ORDERS</span>
+          <span class="plate__sub" id="procs-total"></span>
+        </div>
+        <div class="procs__cols">
+          <div class="procs__col">
+            <span class="micro">BY CPU</span>
+            <ul class="procs__list" id="procs-cpu"></ul>
+          </div>
+          <div class="procs__col">
+            <span class="micro">BY MEMORY</span>
+            <ul class="procs__list" id="procs-mem"></ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- ── disk throughput, endurance and space ──────────────────
+           Windows gives systeminformation nothing here, so every number on
+           this panel comes from the LibreHardwareMonitor feed. -->
+      <article class="plate store" data-panel="storage">
+        <div class="plate__head">
+          <span class="plate__title">PORTAFILTER</span>
+          <span class="plate__sub" id="store-sub"></span>
+        </div>
+        <div class="flow__reads">
+          <div class="flow__read">
+            <span class="flow__arrow">↓</span>
+            <span class="flow__num" id="store-read">--</span>
+            <span class="flow__unit" id="store-read-unit"></span>
+          </div>
+          <div class="flow__read">
+            <span class="flow__arrow">↑</span>
+            <span class="flow__num" id="store-write">--</span>
+            <span class="flow__unit" id="store-write-unit"></span>
+          </div>
+        </div>
+        <svg class="spark spark--io" viewBox="0 0 300 52" preserveAspectRatio="none" aria-hidden="true">
+          <line class="flow__axis" x1="0" y1="26" x2="300" y2="26" />
+          <path class="flow__area" id="store-area-r" />
+          <path class="flow__line" id="store-line-r" />
+          <path class="flow__area flow__mirror" id="store-area-w" />
+          <path class="flow__line flow__mirror" id="store-line-w" />
+        </svg>
+        <div class="drivelist" id="store-drives"></div>
+      </article>
+
+      <!-- ── trend, from readings already being taken ──────────────
+           62 C means nothing on its own: on the way up from 50 and on the way
+           down from 84 are opposite situations. -->
+      <article class="plate trends" data-panel="trends">
+        <div class="plate__head">
+          <span class="plate__title">LOG BOOK</span>
+          <span class="plate__sub" id="trends-span"></span>
+        </div>
+        <div class="trends__rows" id="trends-rows"></div>
+      </article>
+
+      <!-- ── the rest of the forecast the bar has no room for ────── -->
+      <article class="plate wxfc" data-panel="forecast">
+        <div class="plate__head">
+          <span class="plate__title">OUTSIDE</span>
+          <span class="plate__sub" id="fc-sub"></span>
+        </div>
+        <div class="wxfc__hours" id="fc-hours"></div>
+        <div class="wxfc__days" id="fc-days"></div>
+      </article>
+
+      <!-- ── the board's own sensors, none of which fit elsewhere ── -->
+      <article class="plate press" data-panel="pressure">
+        <div class="plate__head">
+          <span class="plate__title">PRESSURE</span>
+          <span class="plate__sub" id="press-sub"></span>
+        </div>
+        <div class="press__fans" id="press-fans"></div>
+        <div class="press__foot">
+          <div><span class="micro">BOARD</span><b id="press-mobo">--</b></div>
+          <div><span class="micro">VCORE</span><b id="press-volts">--</b></div>
+          <div><span class="micro">GPU PWR</span><b id="press-gpupwr">--</b></div>
+          <div><span class="micro">SWAP</span><b id="press-swap">--</b></div>
+        </div>
+      </article>
+
+      <footer class="foot" data-panel="footer">
         <div class="sources" id="sources"></div>
         <div class="disks">
           <span class="drives" id="drives"></span>
           <span class="disks__caps" id="disks"></span>
         </div>
       </footer>
-
-      <div class="grain" aria-hidden="true"></div>
     </div>
 
     <script type="module" src="js/app.js"></script>

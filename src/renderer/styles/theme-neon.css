@@ -8,11 +8,16 @@
 
    Mark steps validated against this theme's surface (#04070d):
 
-     node scripts/validate_palette.js "#0e9fb6,#c4841a,#e0247f,#7d5fe0" \
+     node scripts/validate_palette.mjs "#0e9fb6,#c4841a,#e0247f" \
           --mode dark --surface "#04070d" --pairs all
      → lightness band PASS · chroma floor PASS · CVD separation PASS
-       (worst all-pairs ΔE 8.6 deutan) · normal-vision PASS (20.6) ·
-       contrast vs surface PASS (all ≥ 3:1) */
+       (worst all-pairs ΔE 8.6 deutan, 13.5 tritan) · normal-vision PASS
+       (23.1) · contrast vs surface PASS (all ≥ 3:1)
+
+   The command previously recorded here carried a fourth slot (#7d5fe0) that no
+   token in this file uses, so its numbers could not be reproduced from the
+   theme as shipped. `npm run themes` re-runs this against the three mark tokens
+   read straight out of the stylesheet, which is why it cannot drift again. */
 
 body[data-theme='neon'] {
   color-scheme: dark;

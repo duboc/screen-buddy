@@ -313,6 +313,10 @@ if ($script:Warnings.Count) {
     Write-Host '  Setup complete.' -ForegroundColor Green
 }
 
+Write-Host ''
+Write-Host '  Tune it from the tray icon > Settings...  (or http://127.0.0.1:8787/)' -ForegroundColor Gray
+Write-Host '  Theme, fonts, type scale, panels and page rotation, previewed live.' -ForegroundColor Gray
+
 if (-not $NoLaunch -and -not $Minimal) {
     Write-Host ''
     if ($PSCmdlet.ShouldProcess('screen-buddy', 'start')) {

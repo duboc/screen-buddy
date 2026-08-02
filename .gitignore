@@ -10,5 +10,10 @@ __pycache__/
 # User's local overrides — config.example.json is the tracked template
 config.json
 
+# Restore points for config.json: local history, not shared state. The tracked
+# template above is what "reset to shipped defaults" rolls back to, which is why
+# losing this directory can never leave you without a way back.
+config.backups/
+
 .DS_Store
 Thumbs.db

@@ -8,6 +8,8 @@ const { NowPlayingSource } = require('./nowplaying');
 const { NetStatsSource } = require('./netstats');
 const { WeatherSource } = require('./weather');
 const { PingSource } = require('./ping');
+const { ProcessesSource } = require('./processes');
+const { History } = require('../history');
 
 /**
  * Merges the three sources into one normalized snapshot and emits it on a timer.
@@ -32,6 +34,12 @@ class SensorHub extends EventEmitter {
     });
     this.weather = new WeatherSource(config.sensors.weather);
     this.ping = new PingSource(config.sensors.ping);
+    this.processes = new ProcessesSource(config.sensors.processes);
+    this.history = new History({
+      windowSec: Math.max(60, (config.ui?.history?.windowMinutes ?? 15) * 60),
+      points: config.ui?.history?.points ?? 60,
+      thresholds: config.thresholds,
+    });
     this.fastTimer = null;
     this.slowTimer = null;
     this.lastSnapshot = null;
@@ -43,6 +51,7 @@ class SensorHub extends EventEmitter {
     this.netStats.start();
     this.weather.start();
     this.ping.start();
+    this.processes.start();
     await this.system.init();
     await Promise.all([this.system.pollFast(), this.lhm.poll()]);
     this.emitSnapshot();
@@ -59,8 +68,13 @@ class SensorHub extends EventEmitter {
   }
 
   emitSnapshot() {
-    this.lastSnapshot = this.buildSnapshot();
-    this.emit('snapshot', this.lastSnapshot);
+    const snapshot = this.buildSnapshot();
+    // Recorded before the trend block is attached, so history never folds its
+    // own output back into itself.
+    this.history.push(snapshot);
+    snapshot.history = this.history.read();
+    this.lastSnapshot = snapshot;
+    this.emit('snapshot', snapshot);
   }
 
   buildSnapshot() {
@@ -71,6 +85,7 @@ class SensorHub extends EventEmitter {
     const net = this.netStats.read();
     const weather = this.weather.read();
     const ping = this.ping.read();
+    const procs = this.processes.read();
 
     const s = sys.data || {};
     const g = gpu.data || {};
@@ -143,6 +158,14 @@ class SensorHub extends EventEmitter {
       // Drive temperatures ride along in the LHM feed; empty when it is absent.
       drives: l.drives ?? [],
 
+      // Read/write rates, endurance and free space, also from the LHM feed.
+      // Windows gives systeminformation nothing here - fsStats() and disksIO()
+      // both return null - so this is the only source of disk throughput.
+      storage: l.storage ?? [],
+
+      // Which processes are actually responsible for the numbers above.
+      processes: procs.data ?? null,
+
       weather: weather.data ?? null,
       ping: ping.data ?? null,
 
@@ -166,6 +189,7 @@ class SensorHub extends EventEmitter {
         media: { ok: media.available, reason: media.reason },
         net: { ok: net.available, reason: net.reason },
         weather: { ok: weather.available, reason: weather.reason },
+        processes: { ok: procs.available, reason: procs.reason },
       },
     };
   }
@@ -178,6 +202,7 @@ class SensorHub extends EventEmitter {
     this.netStats.stop();
     this.weather.stop();
     this.ping.stop();
+    this.processes.stop();
   }
 }
 

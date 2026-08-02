@@ -1,0 +1,170 @@
+/* ── theme: phosphor ─────────────────────────────────────────────
+   A P1-phosphor CRT: the blue-green of an oscilloscope tube, heavy scanlines,
+   monospaced lettering, and a generous bloom. The glow layer earns its keep
+   here more than in any other theme, because on a real tube the bloom IS the
+   material.
+
+   Where it stops being a monochrome tube, and why: the status ramp is three
+   hues, not three greens.
+
+   A single-hue ramp cannot be validated. The dark-mode lightness band is
+   L 0.48–0.67, so three greens separated only by lightness have at most ~0.19
+   of L between the extremes and the middle step lands within ΔE 6 of both
+   neighbours — under the CVD floor, and under the normal-vision floor too.
+   That is not a limitation of the checker; it is why real instrument panels
+   with one phosphor colour signal alarm with a flashing or a legend rather
+   than a shade. Keeping the body monochrome and letting the three data steps
+   take real hues is the honest version of the idea:
+
+     node scripts/validate_palette.mjs "#19a58f,#ba8520,#c9403a" \
+          --mode dark --surface "#040a06" --pairs all
+     → lightness band PASS · chroma floor PASS · CVD separation PASS
+       (worst all-pairs ΔE 8.8 deutan, 14.3 tritan) · normal-vision PASS
+       (16.1) · contrast vs surface PASS (all ≥ 3:1)
+
+   The nominal step is teal rather than the obvious green, which is both more
+   accurate — P1 phosphor is blue-green, not the P43 green of a terminal — and
+   what pulls it clear of amber under deuteranopia, where a true green only
+   reached ΔE 7.0. */
+
+body[data-theme='phosphor'] {
+  color-scheme: dark;
+
+  /* A tube drew characters on a grid; a monospace is the honest face for it,
+     and fixed-width digits happen to be exactly right for live readouts. */
+  --font-ui: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+
+  /* the tube */
+  --surface: #040a06;
+  --plate-bg: linear-gradient(177deg, #07150c 0%, #051009 100%);
+  --plate-edge: #12331f;
+  --plate-sheen: linear-gradient(
+    90deg,
+    transparent,
+    rgba(64, 240, 180, 0.16) 22%,
+    rgba(64, 240, 180, 0.16) 78%,
+    transparent
+  );
+  --plate-shadow: 0 0 0 1px rgba(64, 240, 180, 0.04) inset;
+  --plate-radius: 2px;
+  --rule: #12331f;
+
+  /* ink — phosphor green all the way down */
+  --ink: #c9f7e4;
+  --ink-title: #71c9a8;
+  --ink-dim: #71c9a8;
+  --ink-muted: #4d8f77;
+  --ink-faint: #2f5c4a;
+
+  --brass: #3ce0b0;
+
+  /* mark layer — validated */
+  --mark-nominal: #19a58f;
+  --mark-warn: #ba8520;
+  --mark-crit: #c9403a;
+
+  /* glow layer — decoration */
+  --read-nominal: #3ce0b0;
+  --read-warn: #ffb02e;
+  --read-crit: #ff5a4c;
+
+  --halo-nominal: rgba(60, 224, 176, 0.45);
+  --halo-warn: rgba(255, 176, 46, 0.45);
+  --halo-crit: rgba(255, 90, 76, 0.48);
+
+  /* The dial is drawn on the tube like everything else: a dark face with a
+     traced graticule and a bright green needle. */
+  --dial-face: #05100a;
+  --dial-rim: #12331f;
+  --dial-ink: #4d8f77;
+  --zone-crit: #c9403a;
+  --needle: #3ce0b0;
+  --needle-hub: #0a1f14;
+
+  /* vessels & wells */
+  --tank-well: #071410;
+  --tank-edge: #12331f;
+  --tank-graduation: #1e4a35;
+  --lamp-well: #05100a;
+  --art-well: #05100a;
+
+  --flow-stroke: #3ce0b0;
+  --flow-fill: rgba(25, 165, 143, 0.28);
+
+  --ok: #19a58f;
+  --ok-halo: rgba(60, 224, 176, 0.6);
+
+  /* defaults; JS repoints these per element via data-status */
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+  --cell-mark: var(--mark-nominal);
+
+  /* Heavy scanlines: the one theme where the texture is the point. */
+  --grain-display: block;
+  --grain-opacity: 1;
+  --grain-bg: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.26) 3px,
+    rgba(0, 0, 0, 0.26) 4px
+  );
+}
+
+body[data-theme='phosphor'] [data-status='nominal'] {
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+}
+
+body[data-theme='phosphor'] [data-status='warn'] {
+  --status-mark: var(--mark-warn);
+  --status-read: var(--read-warn);
+  --status-halo: var(--halo-warn);
+}
+
+body[data-theme='phosphor'] [data-status='crit'] {
+  --status-mark: var(--mark-crit);
+  --status-read: var(--read-crit);
+  --status-halo: var(--halo-crit);
+}
+
+/* Thread cells are too small for a numeral, so they stay on the mark layer:
+   three discrete steps, never a continuous ramp. */
+body[data-theme='phosphor'] .strip__cell[data-status='nominal'] i {
+  --cell-mark: var(--mark-nominal);
+}
+body[data-theme='phosphor'] .strip__cell[data-status='warn'] i {
+  --cell-mark: var(--mark-warn);
+}
+body[data-theme='phosphor'] .strip__cell[data-status='crit'] i {
+  --cell-mark: var(--mark-crit);
+}
+
+/* Bloom on the big readouts — the tube's own material, not an effect. */
+body[data-theme='phosphor'] .bigval__num,
+body[data-theme='phosphor'] .trend__now {
+  text-shadow: 0 0 18px var(--status-halo);
+}
+
+body[data-theme='phosphor'] .bar__time {
+  text-shadow: 0 0 14px rgba(60, 224, 176, 0.35);
+}
+
+body[data-theme='phosphor'][data-glow='off'] .bigval__num,
+body[data-theme='phosphor'][data-glow='off'] .trend__now,
+body[data-theme='phosphor'][data-glow='off'] .bar__time {
+  text-shadow: none;
+}
+
+body[data-theme='phosphor'][data-glow='off'] {
+  --halo-nominal: transparent;
+  --halo-warn: transparent;
+  --halo-crit: transparent;
+  --ok-halo: transparent;
+}
+
+body[data-theme='phosphor'][data-scanlines='off'] {
+  --grain-display: none;
+}

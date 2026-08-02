@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>screen-buddy · settings</title>
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="top__brand">
+        <svg class="top__cup" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 8h13v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z" />
+          <path d="M16 9.5h2.5a2.5 2.5 0 0 1 0 5H16" />
+          <path d="M2 21h15" />
+        </svg>
+        <span>screen-buddy</span>
+        <em>settings</em>
+      </div>
+
+      <!-- Live readings from the panel itself. The point is not the numbers —
+           it is knowing at a glance that the thing you are editing is running
+           and answering, especially when you are editing it from another
+           machine and cannot see it. -->
+      <div class="pulse" id="pulse">
+        <span class="pulse__dot" data-state="wait"></span>
+        <span id="pulse-text">connecting…</span>
+      </div>
+    </header>
+
+    <nav class="tabs" id="tabs" aria-label="Settings sections"></nav>
+
+    <main class="sheet" id="sheet">
+      <p class="loading">Loading configuration…</p>
+    </main>
+
+    <footer class="bar" id="savebar">
+      <div class="bar__status" id="status">
+        Changes preview on the panel as you make them. Nothing is written until
+        you save.
+      </div>
+      <div class="bar__actions">
+        <button type="button" class="btn" id="revert" disabled>Discard</button>
+        <button type="button" class="btn btn--primary" id="save" disabled>
+          Save to config.json
+        </button>
+      </div>
+    </footer>
+
+    <script type="module" src="admin.js"></script>
+  </body>
+</html>

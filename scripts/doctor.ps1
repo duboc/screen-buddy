@@ -291,6 +291,30 @@ $procs = @(Get-CimInstance Win32_Process -Filter "Name = 'electron.exe'" -ErrorA
 if ($procs.Count) { Pass "HUD is running ($($procs.Count) processes)" }
 else { Info 'HUD is not running. Start it with: npm start' }
 
+# -- restore points -------------------------------------------------------
+# Reported here because doctor is what you run when something is wrong, and
+# "put it back how it was" is often the shortest fix.
+
+$backupDir = Join-Path $ProjectRoot 'config.backups'
+$points = @()
+if (Test-Path $backupDir) {
+    $points = @(Get-ChildItem -Path $backupDir -Filter '*.json' -ErrorAction SilentlyContinue)
+}
+if ($points.Count) {
+    $newest = ($points | Sort-Object LastWriteTime -Descending)[0]
+    Pass "$($points.Count) config restore point(s), newest $($newest.LastWriteTime.ToString('yyyy-MM-dd HH:mm'))"
+} else {
+    Info 'No config restore points yet (one is taken automatically before each save)'
+}
+
+# The tracked template is the floor: even with no restore points and no
+# config.json, this is what a reset returns to.
+if (Test-Path (Join-Path $ProjectRoot 'config.example.json')) {
+    Pass 'Shipped template present, so a full reset is always available'
+} else {
+    Fail 'config.example.json is missing' 'Restore it from git: git checkout config.example.json. Reset still works from built-in defaults.'
+}
+
 # -- summary --------------------------------------------------------------
 
 Write-Host ''
@@ -300,4 +324,6 @@ if ($script:Problems.Count) {
 } else {
     Write-Host '  No problems found.' -ForegroundColor Green
 }
+Write-Host ''
+Write-Host '  Undo a config change:  npm run config:list  then  npm run config:restore' -ForegroundColor Gray
 Write-Host ''

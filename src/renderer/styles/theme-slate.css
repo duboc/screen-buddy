@@ -1,0 +1,144 @@
+/* ── theme: slate ────────────────────────────────────────────────
+   The quiet one. Neutral graphite, no grain, no gradient, no brass — a flat
+   instrument housing that stays out of the way. Espresso and neon both have a
+   strong opinion about the room they are in; this one does not, which is the
+   whole point of it.
+
+   Being understated is a constraint on the body, not on the data. The mark
+   layer is as saturated here as anywhere else, because desaturating the marks
+   to match the housing is exactly how a calm theme becomes an unreadable one.
+
+   Mark steps validated against this theme's surface (#16181c):
+
+     node scripts/validate_palette.mjs "#4f93d1,#ba8520,#cb5062" \
+          --mode dark --surface "#16181c" --pairs all
+     → lightness band PASS · chroma floor PASS · CVD separation PASS
+       (worst all-pairs ΔE 9.2 deutan, 10.6 tritan) · normal-vision PASS
+       (16.1) · contrast vs surface PASS (all ≥ 3:1)
+
+   The critical step is a rose rather than a brick red. A desaturated blue-grey
+   body left the obvious brick (#c4544c) at ΔE 14.1 against the warn step under
+   normal vision — under the 15 floor, meaning full-colour readers would
+   struggle too. Rotating the hue toward magenta fixed it without touching the
+   lightness the body depends on. */
+
+body[data-theme='slate'] {
+  color-scheme: dark;
+
+  --font-ui: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+
+  /* housing — flat, no gradient */
+  --surface: #16181c;
+  --plate-bg: #1d2026;
+  --plate-edge: #2f343d;
+  --plate-sheen: transparent;
+  --plate-shadow: none;
+  --plate-radius: 6px;
+  --rule: #2b3038;
+
+  /* ink */
+  --ink: #e7eaee;
+  --ink-title: #aeb6c1;
+  --ink-dim: #98a1ad;
+  --ink-muted: #737d8a;
+  --ink-faint: #4d5763;
+
+  --brass: #8fa3ba;
+
+  /* mark layer — validated, and deliberately not desaturated to match the body */
+  --mark-nominal: #4f93d1;
+  --mark-warn: #ba8520;
+  --mark-crit: #cb5062;
+
+  --read-nominal: #7fb4e4;
+  --read-warn: #dda93c;
+  --read-crit: #e0798a;
+
+  --halo-nominal: rgba(79, 147, 209, 0.38);
+  --halo-warn: rgba(186, 133, 32, 0.38);
+  --halo-crit: rgba(203, 80, 98, 0.42);
+
+  /* A dark instrument face rather than a cream manometer — this housing has a
+     smoked window, not a printed dial. */
+  --dial-face: #1a1d22;
+  --dial-rim: #333944;
+  --dial-ink: #8892a0;
+  --zone-crit: #cb5062;
+  --needle: #e7eaee;
+  --needle-hub: #333944;
+
+  /* vessels & wells */
+  --tank-well: #14171b;
+  --tank-edge: #2f343d;
+  --tank-graduation: #3c434e;
+  --lamp-well: #14171b;
+  --art-well: #16191e;
+
+  --flow-stroke: #8fa3ba;
+  --flow-fill: rgba(143, 163, 186, 0.18);
+
+  --ok: #4f93d1;
+  --ok-halo: rgba(79, 147, 209, 0.5);
+
+  /* defaults; JS repoints these per element via data-status */
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+  --cell-mark: var(--mark-nominal);
+
+  /* No texture at all. Every other theme has a material; this one is the
+     absence of one. */
+  --grain-display: none;
+  --grain-opacity: 0;
+  --grain-bg: none;
+}
+
+body[data-theme='slate'] [data-status='nominal'] {
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+}
+
+body[data-theme='slate'] [data-status='warn'] {
+  --status-mark: var(--mark-warn);
+  --status-read: var(--read-warn);
+  --status-halo: var(--halo-warn);
+}
+
+body[data-theme='slate'] [data-status='crit'] {
+  --status-mark: var(--mark-crit);
+  --status-read: var(--read-crit);
+  --status-halo: var(--halo-crit);
+}
+
+/* Thread cells are too small for a numeral, so they stay on the mark layer:
+   three discrete steps, never a continuous ramp. */
+body[data-theme='slate'] .strip__cell[data-status='nominal'] i {
+  --cell-mark: var(--mark-nominal);
+}
+body[data-theme='slate'] .strip__cell[data-status='warn'] i {
+  --cell-mark: var(--mark-warn);
+}
+body[data-theme='slate'] .strip__cell[data-status='crit'] i {
+  --cell-mark: var(--mark-crit);
+}
+
+body[data-theme='slate'][data-glow='off'] {
+  --halo-nominal: transparent;
+  --halo-warn: transparent;
+  --halo-crit: transparent;
+  --ok-halo: transparent;
+}
+
+/* Scanlines are opt-IN here, since the theme ships with no texture. */
+body[data-theme='slate'][data-scanlines='on'] {
+  --grain-display: block;
+  --grain-opacity: 1;
+  --grain-bg: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.14) 3px,
+    rgba(0, 0, 0, 0.14) 4px
+  );
+}

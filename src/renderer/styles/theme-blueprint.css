@@ -1,0 +1,155 @@
+/* ── theme: blueprint ────────────────────────────────────────────
+   A cyanotype drawing board. Deep process blue, pale drafting lines, and
+   dials that read as white paper pinned to the board rather than as lit
+   glass — the dial faces are the one thing here that is not blue, which is
+   what makes them the first thing you look at.
+
+   Same two-layer rule as every theme in this project: the MARK layer carries
+   data and is validated; the glow layer is decoration that always duplicates a
+   mark already drawn beside a numeral.
+
+   Mark steps validated against this theme's surface (#0b2036):
+
+     node scripts/validate_palette.mjs "#2e9fc4,#ba8520,#c33a52" \
+          --mode dark --surface "#0b2036" --pairs all
+     → lightness band PASS · chroma floor PASS · CVD separation PASS
+       (worst all-pairs ΔE 11.6 deutan, 14.6 tritan) · normal-vision PASS
+       (18.9) · contrast vs surface PASS (all ≥ 3:1)
+
+   The critical step is a crimson rather than a pure red, and sits a full 0.10
+   of OKLCH lightness below the warn step. Amber and red are adjacent hues that
+   collapse under deuteranopia — on this surface a pure red only reached ΔE 7.1,
+   inside the floor band. The separation is bought with lightness, not hue. */
+
+body[data-theme='blueprint'] {
+  color-scheme: dark;
+
+  /* Bahnschrift is the Windows condensed industrial face; on a drawing board
+     it reads as stencilled lettering. */
+  --font-ui: 'Bahnschrift', 'Segoe UI Variable Text', 'Segoe UI', system-ui,
+    sans-serif;
+
+  /* the board */
+  --surface: #0b2036;
+  --plate-bg: linear-gradient(177deg, #123050 0%, #0e2742 46%, #0b2038 100%);
+  --plate-edge: #2b587f8c;
+  --plate-sheen: linear-gradient(
+    90deg,
+    transparent,
+    rgba(168, 214, 255, 0.22) 20%,
+    rgba(168, 214, 255, 0.22) 80%,
+    transparent
+  );
+  --plate-shadow: 0 1px 0 rgba(190, 226, 255, 0.07) inset,
+    0 6px 16px rgba(0, 0, 0, 0.4);
+  --plate-radius: 3px;
+  --rule: #24547c;
+
+  /* ink — drafting white, stepping down to a faint pencil */
+  --ink: #e9f3ff;
+  --ink-title: #a8cdf0;
+  --ink-dim: #8fb4d8;
+  --ink-muted: #6d92b6;
+  --ink-faint: #46688c;
+
+  --brass: #6fc3e8;
+
+  /* mark layer — validated */
+  --mark-nominal: #2e9fc4;
+  --mark-warn: #ba8520;
+  --mark-crit: #c33a52;
+
+  /* Lifted a step for the big numerals and the waterline, which are text and
+     thin marks rather than large fills. */
+  --read-nominal: #63c4e6;
+  --read-warn: #dfa93b;
+  --read-crit: #e2647c;
+
+  --halo-nominal: rgba(46, 159, 196, 0.45);
+  --halo-warn: rgba(186, 133, 32, 0.45);
+  --halo-crit: rgba(195, 58, 82, 0.5);
+
+  /* The dial is a white print: the only unblued object on the board, and
+     therefore the one the eye lands on first. */
+  --dial-face: #eef4fa;
+  --dial-rim: #7b9ec0;
+  --dial-ink: #123050;
+  --zone-crit: #b3243f;
+  --needle: #b3243f;
+  --needle-hub: #c9d9e8;
+
+  /* vessels & wells */
+  --tank-well: #081a2ccc;
+  --tank-edge: #2c5a80;
+  --tank-graduation: #3f6f96;
+  --lamp-well: #08192b;
+  --art-well: #0a1e33;
+
+  --flow-stroke: #6fc3e8;
+  --flow-fill: rgba(111, 195, 232, 0.2);
+
+  --ok: #2e9fc4;
+  --ok-halo: rgba(111, 195, 232, 0.6);
+
+  /* defaults; JS repoints these per element via data-status */
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+  --cell-mark: var(--mark-nominal);
+
+  /* A drafting grid rather than scanlines — the texture that belongs on a
+     drawing board. */
+  --grain-display: block;
+  --grain-opacity: 0.85;
+  --grain-bg: repeating-linear-gradient(
+      0deg,
+      rgba(150, 205, 255, 0.05) 0 1px,
+      transparent 1px 26px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(150, 205, 255, 0.05) 0 1px,
+      transparent 1px 26px
+    );
+}
+
+body[data-theme='blueprint'] [data-status='nominal'] {
+  --status-mark: var(--mark-nominal);
+  --status-read: var(--read-nominal);
+  --status-halo: var(--halo-nominal);
+}
+
+body[data-theme='blueprint'] [data-status='warn'] {
+  --status-mark: var(--mark-warn);
+  --status-read: var(--read-warn);
+  --status-halo: var(--halo-warn);
+}
+
+body[data-theme='blueprint'] [data-status='crit'] {
+  --status-mark: var(--mark-crit);
+  --status-read: var(--read-crit);
+  --status-halo: var(--halo-crit);
+}
+
+/* Thread cells are too small for a numeral, so they stay on the mark layer:
+   three discrete steps, never a continuous ramp. */
+body[data-theme='blueprint'] .strip__cell[data-status='nominal'] i {
+  --cell-mark: var(--mark-nominal);
+}
+body[data-theme='blueprint'] .strip__cell[data-status='warn'] i {
+  --cell-mark: var(--mark-warn);
+}
+body[data-theme='blueprint'] .strip__cell[data-status='crit'] i {
+  --cell-mark: var(--mark-crit);
+}
+
+body[data-theme='blueprint'][data-glow='off'] {
+  --halo-nominal: transparent;
+  --halo-warn: transparent;
+  --halo-crit: transparent;
+  --ok-halo: transparent;
+}
+
+body[data-theme='blueprint'][data-scanlines='off'] {
+  --grain-display: none;
+}

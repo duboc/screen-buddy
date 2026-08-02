@@ -18,7 +18,7 @@
    The status ramp is cool-to-hot, which matches what it means. Validated with
    the data-viz validator against the machine body:
 
-     node scripts/validate_palette.js "#4795c0,#bf8a24,#c2392e" \
+     node scripts/validate_palette.mjs "#4795c0,#bf8a24,#c2392e" \
           --mode dark --surface "#17120f" --pairs all
      → lightness band PASS · chroma floor PASS · CVD separation PASS
        (worst pair ΔE 12.1 deutan, 16.7 tritan) · normal-vision PASS (18.2) ·
